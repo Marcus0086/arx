@@ -1,0 +1,21 @@
+{
+    // Don’t require rustup (we use Nix)
+    "rust-analyzer.rustup.enable": false,
+  
+    "rust-analyzer.check.allTargets": true,
+  
+    // Speed & noise
+    "rust-analyzer.files.excludeDirs": ["target"],
+    "rust-analyzer.cargo.features": "all",
+  
+    // Optional: if your workspace is nonstandard, point to root Cargo.toml
+    // "rust-analyzer.linkedProjects": ["./Cargo.toml"],
+  
+    // Nix projects typically have many symlinks; reduce file watcher load
+    "files.watcherExclude": {
+      "**/target/**": true,
+      "**/.direnv/**": true,
+      "**/.git/**": false
+    }
+  }
+  

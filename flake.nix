@@ -15,7 +15,7 @@
           overlays = [ (import rust-overlay) ];
         };
 
-        rust = pkgs.rust-bin.stable.latest.default;
+        rust = pkgs.rust-bin.stable.latest.complete;
 
         native = with pkgs; [
           pkg-config
