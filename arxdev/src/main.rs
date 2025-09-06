@@ -21,7 +21,7 @@ fn main() -> Result<(), ArxError> {
     match cli.command {
         Commands::Pack { out, inputs } => {
             let refs: Vec<_> = inputs.iter().map(|p| p.as_path()).collect();
-            arx_core::pack(&refs, &out)?;
+            arx_core::pack(&refs, &out, None)?;
         }
         Commands::List { archive } => {
             arx_core::list(&archive)?;

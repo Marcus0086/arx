@@ -1,20 +1,53 @@
 #![forbid(unsafe_code)]
 
 pub mod error;
+pub mod policy;
 
-use std::path::Path;
-
-pub fn pack(inputs: &[&Path], out: &Path) -> Result<(), error::ArxError> {
-    println!("Packing {:?} into {:?}", inputs, out);
-    Ok(())
+pub mod util {
+    pub mod buf;
+    pub mod sanitize;
+    pub mod varint;
 }
 
-pub fn list(archive: &Path) -> Result<(), error::ArxError> {
-    println!("Listing {:?}", archive);
-    Ok(())
+pub mod chunking {
+    pub mod fastcdc;
 }
 
-pub fn extract(archive: &Path, dest: &Path) -> Result<(), error::ArxError> {
-    println!("Extracting {:?} to {:?}", archive, dest);
-    Ok(())
+pub mod hash {
+    pub mod blake3;
 }
+
+pub mod codec {
+    pub mod store;
+    pub mod zstdc;
+}
+
+pub mod crypto {
+    pub mod aead;
+    pub mod kdf;
+    pub mod nonce;
+}
+
+pub mod container {
+    pub mod chunktab;
+    pub mod manifest;
+    pub mod superblock;
+    pub mod tail;
+}
+
+pub mod pack {
+    pub mod walker;
+    pub mod writer;
+}
+
+pub mod read {
+    pub mod extract;
+    pub mod reader;
+}
+
+pub mod list;
+
+// Re-exports: stable API surface
+pub use list::list;
+pub use pack::writer::{Encryption, PackOptions, pack};
+pub use read::extract::extract;
