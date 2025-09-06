@@ -43,18 +43,6 @@
             mkdir -p .cache/sccache
             export SCCACHE_DIR="$PWD/.cache/sccache"
             export SCCACHE_CACHE_SIZE="20G"
-
-            # Use sparse index (faster cargo)
-            mkdir -p .cargo
-            if [ ! -f .cargo/config.toml ]; then
-              cat > .cargo/config.toml <<'CFG'
-[source.crates-io]
-replace-with = "sparse"
-[source.sparse]
-registry = "sparse+https://index.crates.io/"
-CFG
-            fi
-
             echo "🦀 dev shell active (Rust pinned by flake)"
           '';
         };

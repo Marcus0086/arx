@@ -1,1 +1,4 @@
 /target
+.cache
+.cargo-home
+.direnv
