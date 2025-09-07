@@ -7,3 +7,4 @@ test
 *.bin
 dataset
 .DS_Store
+*.arx
