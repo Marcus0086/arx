@@ -17,10 +17,7 @@ pub mod hash {
     pub mod blake3;
 }
 
-pub mod codec {
-    pub mod store;
-    pub mod zstdc;
-}
+pub mod codec;
 
 pub mod crypto {
     pub mod aead;

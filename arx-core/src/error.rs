@@ -8,3 +8,6 @@ pub enum ArxError {
     #[error("Format error: {0}")]
     Format(String),
 }
+
+// Convenient crate-wide result type
+pub type Result<T> = std::result::Result<T, ArxError>;

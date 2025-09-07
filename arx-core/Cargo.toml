@@ -6,8 +6,10 @@ edition = "2024"
 [dependencies]
 blake3 = "1.8.2"
 ciborium = "0.2.2"
+rayon = "1.11.0"
 serde = { version = "1.0.219", features = ["derive"] }
+tempfile = "3.21.0"
 thiserror = "2.0.16"
-time = "0.3.43"
+time = { version = "0.3.43", features = ["macros"] }
 walkdir = "2.5.0"
-zstd = "0.13.3"
+zstd = { version = "0.13.3", features = ["zstdmt"] }
