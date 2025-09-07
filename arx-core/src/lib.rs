@@ -43,7 +43,9 @@ pub mod pack {
 
 pub mod read {
     pub mod extract;
+    pub mod opened;
     pub mod reader;
+    pub mod stream;
 }
 
 pub mod list;
@@ -55,6 +57,12 @@ pub use pack::writer::{PackOptions, pack};
 pub use read::extract::{ExtractOptions, extract};
 
 pub use list::{ListOptions, list};
+
+pub mod repo;
+pub mod repo_factory;
+pub mod repo_fs;
+
+pub mod domain;
 
 pub use container::chunktab::ChunkEntry;
 pub use container::manifest::{DirEntry, FileEntry, Manifest};
