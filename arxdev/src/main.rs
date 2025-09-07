@@ -1,4 +1,4 @@
-use arx_core::error::ArxError;
+use arx_core::error::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -16,7 +16,7 @@ struct Cli {
     command: Commands,
 }
 
-fn main() -> Result<(), ArxError> {
+fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Commands::Pack { out, inputs } => {
