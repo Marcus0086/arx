@@ -4,3 +4,6 @@
 .direnv
 result
 test
+*.bin
+dataset
+.DS_Store
