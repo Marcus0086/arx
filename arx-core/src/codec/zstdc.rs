@@ -13,7 +13,7 @@ impl Compressor for ZstdCompressor {
         // Optional: enable multithreading when compiled with the "zstdmt" feature.
         #[cfg(feature = "zstdmt")]
         {
-            let _ = enc.multithread(0);
+            let _ = enc.multithread(1);
         }
         let mut w = enc.auto_finish();
         let written_uncompressed = std::io::copy(src, &mut w)?;

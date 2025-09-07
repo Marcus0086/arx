@@ -151,11 +151,7 @@ pub fn pack(inputs: &[&Path], out: &Path, opts: Option<&PackOptions>) -> Result<
     files.sort();
 
     let min_gain = effective_min_gain(opts);
-    let params = ChunkParams {
-        min: 64 * 1024,
-        avg: 256 * 1024,
-        max: 1 * 1024 * 1024,
-    }; // ~256 KiB target chunk size
+    let params = ChunkParams::default(); // ~256 KiB target chunk size
     let zstd = ZstdCompressor;
     let _store = Store; // not used for trial; STORE size == u_size
 
@@ -239,7 +235,6 @@ pub fn pack(inputs: &[&Path], out: &Path, opts: Option<&PackOptions>) -> Result<
             } else {
                 let id = chunk_entries.len() as u64;
                 chunk_entries.push(ChunkEntry {
-                    hash: nc.hash,
                     codec: nc.codec,
                     u_size: nc.u_size,
                     c_size: nc.c_size,
