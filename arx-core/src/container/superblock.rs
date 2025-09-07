@@ -1,7 +1,7 @@
 use std::io::{Read, Write};
 
 pub const MAGIC: &[u8; 6] = b"ARXALP"; // alpha marker
-pub const VERSION: u16 = 1;
+pub const VERSION: u16 = 3;
 
 // 6 bytes for magic
 // 2 bytes for version
@@ -9,8 +9,9 @@ pub const VERSION: u16 = 1;
 // 8 bytes for chunk_table_off
 // 8 bytes for chunk_count
 // 8 bytes for data_off
-pub const HEADER_LEN: u64 = 40; // 6 + 2 + 8 + 8 + 8 + 8
-
+// 8 bytes for flags
+pub const HEADER_LEN: u64 = 48; // 6 + 2 + 8 + 8 + 8 + 8 + 8
+pub const FLAG_ENCRYPTED: u64 = 1 << 0;
 #[derive(Debug, Clone, Copy)]
 pub struct Superblock {
     pub version: u16,
@@ -20,6 +21,7 @@ pub struct Superblock {
     pub chunk_count: u64,
     /// Absolute file offset where the data section starts (manifest_end)
     pub data_off: u64,
+    pub flags: u64,
 }
 
 impl Superblock {
@@ -30,6 +32,7 @@ impl Superblock {
         w.write_all(&self.chunk_table_off.to_le_bytes())?;
         w.write_all(&self.chunk_count.to_le_bytes())?;
         w.write_all(&self.data_off.to_le_bytes())?;
+        w.write_all(&self.flags.to_le_bytes())?;
         Ok(())
     }
 
@@ -59,12 +62,17 @@ impl Superblock {
         r.read_exact(&mut doff)?;
         let data_off = u64::from_le_bytes(doff);
 
+        let mut flags = [0u8; 8];
+        r.read_exact(&mut flags)?;
+        let flags = u64::from_le_bytes(flags);
+
         Ok(Self {
             version,
             manifest_len,
             chunk_table_off,
             chunk_count,
             data_off,
+            flags,
         })
     }
 }
