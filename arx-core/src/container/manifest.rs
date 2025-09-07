@@ -1,13 +1,16 @@
 use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ChunkRef {
+    pub id: u64,     // index into ChunkTable
+    pub u_size: u64, // uncompressed size of this chunk
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FileEntry {
     pub path: String,
     pub mode: u32,
     pub mtime: i64,
     pub u_size: u64,
-    pub c_size: u64,
-    pub codec: u8,     // 0: STORE, 1: ZSTD
-    pub data_off: u64, // absolute offset in archive where file bytes begin
+    pub chunk_refs: Vec<ChunkRef>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

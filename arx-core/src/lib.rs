@@ -46,5 +46,5 @@ pub mod list;
 
 // Re-exports: stable API surface
 pub use list::list;
-pub use pack::writer::{Encryption, PackOptions, pack};
+pub use pack::writer::{PackOptions, pack};
 pub use read::extract::extract;
