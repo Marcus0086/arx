@@ -1,5 +1,26 @@
 use std::io::{Read, Write};
 
+// ! Superblock Structure Layout (48 bytes total)
+// !
+// ! ```
+// ! ┌─────────────────────────────────────────────────────────────────────────────┐
+// ! │                           ARX Archive Superblock                            │
+// ! ├─────────────────┬───────────────────────────────────────────────────────────┤
+// ! │ Offset (bytes)  │ Field                                                     │
+// ! ├─────────────────┼───────────────────────────────────────────────────────────┤
+// ! │ 0-5   (6 bytes) │ Magic: "ARXALP"                                           │
+// ! │ 6-7   (2 bytes) │ Version: u16 (little-endian)                              │
+// ! │ 8-15  (8 bytes) │ Manifest Length: u64 (little-endian)                      │
+// ! │ 16-23 (8 bytes) │ Chunk Table Offset: u64 (little-endian)                   │
+// ! │ 24-31 (8 bytes) │ Chunk Count: u64 (little-endian)                          │
+// ! │ 32-39 (8 bytes) │ Data Offset: u64 (little-endian)                          │
+// ! │ 40-47 (8 bytes) │ Flags: u64 (little-endian)                                │
+// ! └─────────────────┴───────────────────────────────────────────────────────────┘
+// !
+// ! Flags:
+// ! - Bit 0: FLAG_ENCRYPTED (0x1) - Archive is encrypted
+// ! ```
+
 pub const MAGIC: &[u8; 6] = b"ARXALP"; // alpha marker
 pub const VERSION: u16 = 3;
 
