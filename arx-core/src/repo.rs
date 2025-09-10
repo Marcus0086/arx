@@ -1,4 +1,3 @@
-// arx_core/src/repo.rs
 use crate::domain::{ChunkRow, FileRow};
 use crate::error::Result;
 use std::io::Read;

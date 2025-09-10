@@ -1,8 +1,9 @@
 use crate::error::Result;
+use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 
 #[repr(u8)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CodecId {
     Store = 0,
     Zstd = 1,

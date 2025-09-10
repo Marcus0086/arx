@@ -4,6 +4,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub mod error;
 pub mod policy;
+pub mod stats;
 
 pub mod util {
     pub mod buf;
@@ -31,6 +32,8 @@ pub mod crypto {
 
 pub mod container {
     pub mod chunktab;
+    pub mod delta;
+    pub mod journal;
     pub mod manifest;
     pub mod superblock;
     pub mod tail;
@@ -48,8 +51,11 @@ pub mod read {
     pub mod stream;
 }
 
+pub mod crud;
+pub mod index {
+    pub mod inmem;
+}
 pub mod list;
-
 pub use crate::error::Result;
 
 pub use pack::writer::{PackOptions, pack};
