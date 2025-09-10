@@ -3,8 +3,10 @@
 .cargo-home
 .direnv
 result
-test
+test*
 *.bin
 dataset
 .DS_Store
 *.arx
+*.delta
+*.log

@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 clap = { version = "4.5.46", features = ["derive"] }
 arx-core = { path = "../arx-core" }
+walkdir = "2.5.0"
