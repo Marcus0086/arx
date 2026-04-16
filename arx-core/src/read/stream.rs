@@ -1,7 +1,7 @@
 use super::opened::Opened;
 use crate::crypto::aead::{Region, derive_nonce};
 use crate::error::Result;
-use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::io::{Cursor, Read};
 
 pub struct FileReader<'a> {
     arx: &'a Opened,
@@ -28,32 +28,24 @@ impl<'a> FileReader<'a> {
         let idx = self.chunk_ids[self.cur] as usize;
         let ce = &self.arx.table[idx];
 
-        // read ciphertext
-        let mut f = self
-            .arx
-            .f
-            .lock()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
-        f.seek(SeekFrom::Start(ce.data_off))?;
-        let mut ct = vec![0u8; ce.c_size as usize];
-        f.read_exact(&mut ct)?;
-        drop(f);
+        // Lock-free positional read (no Mutex needed)
+        let ct = self.arx.read_chunk_bytes(ce.data_off, ce.c_size)?;
 
-        // AEAD open (if enabled) — uses Data region with chunk index as counter
+        // AEAD decrypt if enabled
         let pt = if let Some((ref key, salt)) = self.arx.aead {
             let nonce = derive_nonce(&salt, Region::ChunkData, idx as u64);
             crate::crypto::aead::open_whole(key, &nonce, b"chunk", &ct)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?
         } else {
             ct
         };
 
-        // decompress (Store/Zstd)
-        let mut plain = vec![0u8; ce.u_size as usize];
-        let n = crate::codec::get_decoder_u8(ce.codec as u8)
+        // Decompress
+        let mut plain = Vec::with_capacity(ce.u_size as usize);
+        crate::codec::get_decoder_u8(ce.codec)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?
-            .decompress(&mut pt.as_slice(), &mut plain.as_mut_slice())
+            .decompress(&mut pt.as_slice(), &mut plain)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
-        plain.truncate(n as usize);
 
         self.cur += 1;
         self.cur_buf = Some(Cursor::new(plain));
@@ -85,13 +77,35 @@ pub struct RangeReader<'a> {
 
 impl<'a> RangeReader<'a> {
     pub fn new(arx: &'a Opened, path: &str, start: u64, len: u64) -> Result<Self> {
-        let mut fr = FileReader::new(arx, path)?;
-        // advance by consuming `start` bytes (bounded: per-chunk buffer only)
-        std::io::copy(&mut (&mut fr).take(start), &mut std::io::sink())?;
-        Ok(Self {
-            inner: fr,
-            remain: len,
-        })
+        let map = arx.chunk_map_for(path)?;
+
+        // Find which chunk index `start` falls in and the byte offset within that chunk
+        let mut chunk_start_idx = 0usize;
+        let mut offset_in_chunk = start;
+        let chunk_ids: Vec<u32> = map.iter().map(|v| v.id as u32).collect();
+
+        for (i, cv) in map.iter().enumerate() {
+            if offset_in_chunk < cv.u_len {
+                chunk_start_idx = i;
+                break;
+            }
+            offset_in_chunk -= cv.u_len;
+        }
+
+        // Build a FileReader starting at the right chunk
+        let mut fr = FileReader {
+            arx,
+            chunk_ids,
+            cur: chunk_start_idx,
+            cur_buf: None,
+        };
+
+        // Consume intra-chunk offset bytes
+        if offset_in_chunk > 0 {
+            std::io::copy(&mut (&mut fr).take(offset_in_chunk), &mut std::io::sink())?;
+        }
+
+        Ok(Self { inner: fr, remain: len })
     }
 }
 
@@ -101,7 +115,7 @@ impl<'a> Read for RangeReader<'a> {
             return Ok(0);
         }
         let cap = std::cmp::min(self.remain, buf.len() as u64) as usize;
-        let n = (&mut self.inner).read(&mut buf[..cap])?;
+        let n = self.inner.read(&mut buf[..cap])?;
         self.remain -= n as u64;
         Ok(n)
     }

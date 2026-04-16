@@ -2,250 +2,180 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(author, version, about = "arxdev CLI (alpha)", long_about = None)]
+#[command(author, version, about = "arx — modern portable archive", long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
 }
 
+
 #[derive(Subcommand)]
 pub enum ChunkCommands {
-    /// Print chunk map for one file
+    /// Print the chunk map for a file inside the archive.
     Chunks {
         archive: PathBuf,
         path: String,
-        #[arg(long = "key")]
-        key_hex: Option<String>,
-        #[arg(long = "key-salt")]
-        key_salt_hex: Option<String>,
+        #[arg(long = "key")] key_hex: Option<String>,
+        #[arg(long = "password")] password: Option<String>,
     },
-    /// Stream a file (or range) to stdout
+    /// Stream a file (or byte range) to stdout.
     Cat {
         archive: PathBuf,
         path: String,
-        #[arg(long, default_value_t = 0)]
-        start: u64,
-        #[arg(long)]
-        len: Option<u64>,
-        #[arg(long = "key")]
-        key_hex: Option<String>,
-        #[arg(long = "key-salt")]
-        key_salt_hex: Option<String>,
+        #[arg(long, default_value_t = 0)] start: u64,
+        #[arg(long)] len: Option<u64>,
+        #[arg(long = "key")] key_hex: Option<String>,
+        #[arg(long = "password")] password: Option<String>,
     },
-    /// Download one file (or range) to an output path
+    /// Download a file (or byte range) to a local path.
     Get {
         archive: PathBuf,
         path: String,
         out: PathBuf,
-        #[arg(long, default_value_t = 0)]
-        start: u64,
-        #[arg(long)]
-        len: Option<u64>,
-        #[arg(long = "key")]
-        key_hex: Option<String>,
-        #[arg(long = "key-salt")]
-        key_salt_hex: Option<String>,
+        #[arg(long, default_value_t = 0)] start: u64,
+        #[arg(long)] len: Option<u64>,
+        #[arg(long = "key")] key_hex: Option<String>,
+        #[arg(long = "password")] password: Option<String>,
     },
 }
 
 #[derive(Subcommand)]
 pub enum CrudCommands {
-    /// Overlay add/put a file or directory (with --recursive) into archive sidecars (delta + journal)
+    /// Add a file (or directory with --recursive) into the overlay.
     Add {
         archive: PathBuf,
-        /// source file/dir path on disk
+        /// Source file/directory on disk.
         src: PathBuf,
-        /// destination path prefix inside the archive (e.g. "/")
+        /// Destination path prefix inside the archive (e.g. "/").
         dst: String,
-        /// recurse into directories
-        #[arg(long)]
-        recursive: bool,
-        /// file mode (octal). If omitted, inferred from src (on Unix) else 0o644
-        #[arg(long)]
-        mode: Option<u32>,
-        /// mtime in seconds since epoch. If omitted, inferred from src metadata or now()
-        #[arg(long)]
-        mtime: Option<u64>,
-        /// AEAD key (32-byte hex) for encrypted journal+delta
-        #[arg(long = "key")]
-        key_hex: Option<String>,
-        /// AEAD salt (32-byte hex) for nonce derivation
-        #[arg(long = "key-salt")]
-        key_salt_hex: Option<String>,
+        #[arg(long)] recursive: bool,
+        /// File mode (octal). Inferred from src on Unix if omitted.
+        #[arg(long)] mode: Option<u32>,
+        /// mtime (seconds since epoch). Inferred from src metadata if omitted.
+        #[arg(long)] mtime: Option<u64>,
+        #[arg(long = "key")] key_hex: Option<String>,
+        #[arg(long = "password")] password: Option<String>,
     },
 
-    /// Overlay delete (tombstone) a path from the archive
+    /// Delete (tombstone) a path from the overlay.
     Rm {
         archive: PathBuf,
         path: String,
-        #[arg(long)]
-        recursive: bool,
-        #[arg(long = "key")]
-        key_hex: Option<String>,
-        #[arg(long = "key-salt")]
-        key_salt_hex: Option<String>,
+        #[arg(long)] recursive: bool,
+        #[arg(long = "key")] key_hex: Option<String>,
+        #[arg(long = "password")] password: Option<String>,
     },
 
-    /// Overlay rename/move a path within the archive
+    /// Rename/move a path within the overlay.
     Mv {
         archive: PathBuf,
         from: String,
         to: String,
-        #[arg(long = "key")]
-        key_hex: Option<String>,
-        #[arg(long = "key-salt")]
-        key_salt_hex: Option<String>,
+        #[arg(long = "key")] key_hex: Option<String>,
+        #[arg(long = "password")] password: Option<String>,
     },
 
-    /// Overlay list (merged base + sidecars)
+    /// List the merged overlay state (base + journal changes).
     Ls {
         archive: PathBuf,
-        /// optional prefix (e.g. "/etc")
-        #[arg(long)]
-        prefix: Option<String>,
-        /// show long format with size/mtime
-        #[arg(long)]
-        long: bool,
-        #[arg(long = "key")]
-        key_hex: Option<String>,
-        #[arg(long = "key-salt")]
-        key_salt_hex: Option<String>,
+        #[arg(long)] prefix: Option<String>,
+        #[arg(long)] long: bool,
+        #[arg(long = "key")] key_hex: Option<String>,
+        #[arg(long = "password")] password: Option<String>,
     },
 
-    /// Compact overlay back into base `.arx` (fold journal+delta into a fresh immutable archive)
-    Sync {
-        /// existing archive (base .arx + sidecars)
+    /// Show what changed in the overlay vs the base archive.
+    Diff {
         archive: PathBuf,
-        /// output path for the compacted archive (usually overwrite original or write new)
-        #[arg(long, default_value = "drive.arx")]
-        out: PathBuf,
-        /// deterministic mode for compaction
-        #[arg(long)]
-        deterministic: bool,
-        /// min compression gain for zstd before falling back to STORE
-        #[arg(long, default_value_t = 0.05)]
-        min_gain: f32,
-        /// AEAD key/salt to read the overlay (and optionally re-seal the new base)
-        #[arg(long = "key")]
-        key_hex: Option<String>,
-        #[arg(long = "key-salt")]
-        key_salt_hex: Option<String>,
-        /// When set, re-seal the compacted base with the provided key; else write unencrypted base
-        #[arg(long)]
-        seal_base: bool,
+        #[arg(long = "key")] key_hex: Option<String>,
+        #[arg(long = "password")] password: Option<String>,
     },
 
+    /// Compact the overlay back into a fresh immutable base archive.
+    /// If --out is omitted, overwrites the original archive in-place.
+    Sync {
+        archive: PathBuf,
+        /// Output path for the compacted archive (defaults to in-place overwrite).
+        #[arg(long)] out: Option<PathBuf>,
+        #[arg(long)] deterministic: bool,
+        #[arg(long, default_value_t = 0.05)] min_gain: f32,
+        #[arg(long = "key")] key_hex: Option<String>,
+        #[arg(long = "password")] password: Option<String>,
+        /// Re-seal the compacted archive with the provided key.
+        #[arg(long)] seal_base: bool,
+    },
+
+    /// Stream a file from the overlay to stdout.
     Cat {
         archive: PathBuf,
         path: String,
-        #[arg(long = "key")]
-        key_hex: Option<String>,
-        #[arg(long = "key-salt")]
-        key_salt_hex: Option<String>,
+        #[arg(long = "key")] key_hex: Option<String>,
+        #[arg(long = "password")] password: Option<String>,
     },
 
-    /// Download a file from the overlay to an output path
+    /// Download a file from the overlay to a local path.
     Get {
         archive: PathBuf,
         path: String,
         out: PathBuf,
-        #[arg(long = "key")]
-        key_hex: Option<String>,
-        #[arg(long = "key-salt")]
-        key_salt_hex: Option<String>,
+        #[arg(long = "key")] key_hex: Option<String>,
+        #[arg(long = "password")] password: Option<String>,
     },
 }
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Pack inputs into an ARX archive
+    /// Pack files/directories into an ARX archive.
     Pack {
         out: PathBuf,
         inputs: Vec<PathBuf>,
-
-        #[arg(long)]
-        deterministic: bool,
-
-        #[arg(long, default_value_t = 0.05)]
-        min_gain: f32,
-
-        /// 32-byte hex key to enable AEAD (XChaCha20-Poly1305)
-        #[arg(long = "encrypt-raw")]
-        encrypt_raw_hex: Option<String>,
-
-        /// 32-byte hex salt for nonce derivation (defaults to all-zero)
-        #[arg(long = "key-salt")]
-        key_salt_hex: Option<String>,
+        #[arg(long)] deterministic: bool,
+        #[arg(long, default_value_t = 0.05)] min_gain: f32,
+        /// 32-byte hex key to enable AEAD encryption.
+        #[arg(long = "encrypt-raw")] encrypt_raw_hex: Option<String>,
+        /// Derive encryption key from a password (Argon2id).
+        #[arg(long)] password: Option<String>,
     },
 
-    /// List archive contents
+    /// List archive contents.
     List {
         archive: PathBuf,
-
-        /// 32-byte hex key for encrypted archives
-        #[arg(long = "key")]
-        key_hex: Option<String>,
-
-        /// 32-byte hex salt used during pack
-        #[arg(long = "key-salt")]
-        key_salt_hex: Option<String>,
+        #[arg(long = "key")] key_hex: Option<String>,
+        #[arg(long = "password")] password: Option<String>,
     },
 
-    /// Extract archive to destination
+    /// Extract archive to a destination directory.
     Extract {
         archive: PathBuf,
         dest: PathBuf,
-
-        /// 32-byte hex key for encrypted archives
-        #[arg(long = "key")]
-        key_hex: Option<String>,
-
-        /// 32-byte hex salt used during pack
-        #[arg(long = "key-salt")]
-        key_salt_hex: Option<String>,
+        #[arg(long = "key")] key_hex: Option<String>,
+        #[arg(long = "password")] password: Option<String>,
     },
 
-    /// Verify archive integrity (Tail Summary), with optional decryption
+    /// Verify archive integrity via the Tail Summary.
     Verify {
         archive: PathBuf,
-
-        /// 32-byte hex key for encrypted archives
-        #[arg(long = "key")]
-        key_hex: Option<String>,
-
-        /// 32-byte hex salt used during pack
-        #[arg(long = "key-salt")]
-        key_salt_hex: Option<String>,
+        #[arg(long = "key")] key_hex: Option<String>,
+        #[arg(long = "password")] password: Option<String>,
     },
 
-    /// Create/issue a fresh archive with root metadata (optionally sealed)
+    /// Create an empty archive with embedded metadata.
     Issue {
         out: PathBuf,
-        /// root name/label to embed
-        #[arg(long)]
-        label: String,
-        /// root owner string (freeform)
-        #[arg(long, default_value = "")]
-        owner: String,
-        /// optional notes
-        #[arg(long, default_value = "")]
-        notes: String,
-        /// seal with AEAD (32B hex key)
-        #[arg(long = "encrypt-raw")]
-        encrypt_raw_hex: Option<String>,
-        /// 32-byte hex salt for nonce derivation (defaults to all-zero)
-        #[arg(long = "key-salt")]
-        key_salt_hex: Option<String>,
-        /// deterministic superblock/manifest timestamps
-        #[arg(long)]
-        deterministic: bool,
+        #[arg(long)] label: String,
+        #[arg(long, default_value = "")] owner: String,
+        #[arg(long, default_value = "")] notes: String,
+        #[arg(long = "encrypt-raw")] encrypt_raw_hex: Option<String>,
+        /// Derive encryption key from a password (Argon2id).
+        #[arg(long)] password: Option<String>,
+        #[arg(long)] deterministic: bool,
     },
 
     #[command(subcommand)]
-    /// Inspect a file’s chunk map and stream content
+    /// Inspect chunk maps and stream file content.
     Chunk(ChunkCommands),
 
     #[command(subcommand)]
-    /// CRUD overlay commands (sidecars over immutable base)
+    /// CRUD overlay commands (sidecars over an immutable base).
     Crud(CrudCommands),
 }

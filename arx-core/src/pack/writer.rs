@@ -3,7 +3,9 @@ use crate::codec::zstdc::ZstdCompressor;
 use crate::codec::{CodecId, Compressor};
 use crate::container::chunktab::{ChunkEntry, ENTRY_SIZE, write_table};
 use crate::container::manifest::{ChunkRef, DirEntry, FileEntry, Manifest, Meta};
-use crate::container::superblock::{FLAG_ENCRYPTED, HEADER_LEN, Superblock, VERSION};
+use crate::container::superblock::{FLAG_ENCRYPTED, FLAG_KDF_PASSWORD, HEADER_LEN, Superblock, VERSION};
+use crate::crypto::kdf;
+use crate::crypto::nonce::random_salt;
 use crate::container::tail::TailSummary;
 use crate::crypto::aead::{AeadKey, Region, TAG_LEN, derive_nonce, seal_whole};
 use crate::error::Result;
@@ -23,10 +25,17 @@ pub struct PackOptions {
     pub deterministic: bool,
     /// Only accept compression if it saves at least this fraction (e.g. 0.05 = 5%).
     pub min_gain: f32, // default 0.05 if left as 0.0
-    /// Optional raw 32-byte key for AEAD (alpha).
+    /// Optional raw 32-byte key for AEAD encryption.
     pub aead_key: Option<[u8; 32]>,
-    /// Salt for nonce derivation; for deterministic builds, pass all-zero.
+    /// Derive the encryption key from this password via Argon2id.
+    /// If both `aead_key` and `password` are set, `aead_key` takes precedence.
+    pub password: Option<String>,
+    /// KDF salt override (used for deterministic builds); leave as zeros to auto-generate.
     pub key_salt: [u8; 32],
+    /// Optional metadata embedded in the manifest (label, owner, notes).
+    pub meta_label: Option<String>,
+    pub meta_owner: Option<String>,
+    pub meta_notes: Option<String>,
 }
 
 struct CountingWriter<'a, W: Write> {
@@ -193,12 +202,25 @@ pub fn pack(inputs: &[&Path], out: &Path, opts: Option<&PackOptions>) -> Result<
 
     // ── Manifest planning ────────────────────────────────────────────────────
     let deterministic = opts.map(|o| o.deterministic).unwrap_or(false);
-    let created = if deterministic {
-        0
+    let created = if deterministic { 0 } else { OffsetDateTime::now_utc().unix_timestamp() };
+
+    // Resolve encryption key: raw key > password > none.
+    // Generate a random kdf_salt for every archive (even unencrypted) so it's always present.
+    let kdf_salt: [u8; 32] = opts.map(|o| {
+        if o.key_salt != [0u8; 32] { o.key_salt }
+        else if deterministic { [0u8; 32] }
+        else { random_salt() }
+    }).unwrap_or_else(|| if deterministic { [0u8; 32] } else { random_salt() });
+
+    let (enc, password_derived) = if let Some(raw) = opts.and_then(|o| o.aead_key) {
+        (Some((AeadKey(raw), kdf_salt)), false)
+    } else if let Some(pw) = opts.and_then(|o| o.password.as_deref()) {
+        let key = kdf::derive_key(pw, &kdf_salt);
+        (Some((AeadKey(key), kdf_salt)), true)
     } else {
-        OffsetDateTime::now_utc().unix_timestamp()
+        (None, false)
     };
-    let enc = opts.and_then(|o| o.aead_key.as_ref().map(|k| (AeadKey(*k), o.key_salt)));
+    let _ = password_derived; // used for FLAG_KDF_PASSWORD below
 
     let mut chunk_map: HashMap<[u8; 32], u64> = HashMap::new(); // hash → id
     let mut chunk_entries: Vec<ChunkEntry> = Vec::new();
@@ -229,6 +251,7 @@ pub fn pack(inputs: &[&Path], out: &Path, opts: Option<&PackOptions>) -> Result<
                     u_size: nc.u_size,
                     c_size: csz,
                     data_off: 0, // patched after layout
+                    blake3: nc.hash,
                 });
                 plans.push(ChunkPlan {
                     src: fp.path.clone(),
@@ -276,9 +299,13 @@ pub fn pack(inputs: &[&Path], out: &Path, opts: Option<&PackOptions>) -> Result<
     let manifest = Manifest {
         files: file_entries,
         dirs: dirs_entries,
+        symlinks: vec![], // symlink walk wired in Phase C
         meta: Meta {
             created,
-            tool: "arx-core/chunked-alpha".to_string(),
+            tool: format!("arx-core/{}", env!("CARGO_PKG_VERSION")),
+            label: opts.and_then(|o| o.meta_label.clone()),
+            owner: opts.and_then(|o| o.meta_owner.clone()),
+            notes: opts.and_then(|o| o.meta_notes.clone()),
         },
     };
 
@@ -296,7 +323,7 @@ pub fn pack(inputs: &[&Path], out: &Path, opts: Option<&PackOptions>) -> Result<
     h_manifest.update(&manifest_plain);
 
     let enc_enabled = enc.is_some();
-    let flags = if enc_enabled { FLAG_ENCRYPTED } else { 0 };
+    let flags = if enc_enabled { FLAG_ENCRYPTED | if password_derived { FLAG_KDF_PASSWORD } else { 0 } } else { 0 };
 
     let (manifest_bytes, manifest_len) = if let Some((ref key, salt)) = enc {
         let nonce = derive_nonce(&salt, Region::Manifest, 0);
@@ -354,6 +381,7 @@ pub fn pack(inputs: &[&Path], out: &Path, opts: Option<&PackOptions>) -> Result<
         chunk_count: 0,
         data_off: 0,
         flags: 0,
+        kdf_salt,
     }
     .write_to(&mut out_f)?;
 
@@ -430,6 +458,7 @@ pub fn pack(inputs: &[&Path], out: &Path, opts: Option<&PackOptions>) -> Result<
         chunk_count,
         data_off,
         flags,
+        kdf_salt,
     }
     .write_to(&mut out_f)?;
 

@@ -7,6 +7,9 @@ pub enum ArxError {
 
     #[error("Format error: {0}")]
     Format(String),
+
+    #[error("AEAD authentication failed — wrong key or tampered data")]
+    AeadError,
 }
 
 // Convenient crate-wide result type

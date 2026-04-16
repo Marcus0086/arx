@@ -4,9 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+argon2 = "0.5"
 blake3 = "1.8.2"
 chacha20poly1305 = "0.10.1"
 ciborium = "0.2.2"
+getrandom = "0.2"
 hex = "0.4.3"
 rayon = "1.11.0"
 serde = { version = "1.0.219", features = ["derive"] }

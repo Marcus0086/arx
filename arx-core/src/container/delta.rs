@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use crate::container::journal::EncMode;
 use crate::error::Result;
+use crate::util::varint::{uvarint_len, write_uvarint};
 
 use chacha20poly1305::aead::{Aead, KeyInit};
 use chacha20poly1305::{XChaCha20Poly1305, XNonce};
@@ -14,23 +15,6 @@ pub struct DeltaStore {
     pub next_off: u64,
     enc: EncMode,
     salt: [u8; 32],
-}
-
-fn put_uvarint(out: &mut Vec<u8>, mut x: u64) {
-    while x >= 0x80 {
-        out.push((x as u8) | 0x80);
-        x >>= 7;
-    }
-    out.push(x as u8);
-}
-
-fn uvarint_len(mut x: u64) -> usize {
-    let mut n = 1;
-    while x >= 0x80 {
-        x >>= 7;
-        n += 1;
-    }
-    n
 }
 
 impl DeltaStore {
@@ -64,7 +48,8 @@ impl DeltaStore {
             EncMode::Plain => {
                 let off_before = self.f.stream_position()?;
                 let mut lenv = Vec::with_capacity(10);
-                put_uvarint(&mut lenv, frame_plain.len() as u64);
+                write_uvarint(&mut lenv, frame_plain.len() as u64)
+                    .expect("write to Vec never fails");
                 self.f.write_all(&lenv)?;
                 self.f.write_all(frame_plain)?;
                 self.f.flush()?;
@@ -93,7 +78,8 @@ impl DeltaStore {
                     .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "aead encrypt"))?;
 
                 let mut lenv = Vec::with_capacity(10);
-                put_uvarint(&mut lenv, ct.len() as u64);
+                write_uvarint(&mut lenv, ct.len() as u64)
+                    .expect("write to Vec never fails");
                 self.f.write_all(&lenv)?;
                 self.f.write_all(&ct)?;
                 self.f.flush()?;
