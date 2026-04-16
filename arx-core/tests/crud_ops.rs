@@ -6,8 +6,16 @@ use std::io::Read;
 use tempfile::TempDir;
 
 fn issue(out: &std::path::Path) {
-    CrudArchive::issue_archive(out, "test", "tester", "integration test", None, [0u8; 32], true)
-        .expect("issue_archive failed");
+    CrudArchive::issue_archive(
+        out,
+        "test",
+        "tester",
+        "integration test",
+        None,
+        [0u8; 32],
+        true,
+    )
+    .expect("issue_archive failed");
 }
 
 #[test]
@@ -22,7 +30,10 @@ fn test_put_and_ls() {
     let mut arc = CrudArchive::open(&archive).unwrap();
     arc.put_file(&src, "hello.txt", 0o644, 1000).unwrap();
 
-    assert!(arc.index.by_path.contains_key("hello.txt"), "file should be in index");
+    assert!(
+        arc.index.by_path.contains_key("hello.txt"),
+        "file should be in index"
+    );
     let entry = &arc.index.by_path["hello.txt"];
     assert_eq!(entry.size, 15);
 }
@@ -60,7 +71,10 @@ fn test_delete_removes_from_index() {
     assert!(arc.index.by_path.contains_key("file.txt"));
 
     arc.delete_path("file.txt").unwrap();
-    assert!(!arc.index.by_path.contains_key("file.txt"), "file should be deleted");
+    assert!(
+        !arc.index.by_path.contains_key("file.txt"),
+        "file should be deleted"
+    );
 }
 
 #[test]
@@ -76,8 +90,14 @@ fn test_rename() {
     arc.put_file(&src, "orig.txt", 0o644, 1000).unwrap();
     arc.rename("orig.txt", "new.txt").unwrap();
 
-    assert!(!arc.index.by_path.contains_key("orig.txt"), "old path should be gone");
-    assert!(arc.index.by_path.contains_key("new.txt"), "new path should exist");
+    assert!(
+        !arc.index.by_path.contains_key("orig.txt"),
+        "old path should be gone"
+    );
+    assert!(
+        arc.index.by_path.contains_key("new.txt"),
+        "new path should exist"
+    );
 }
 
 #[test]
@@ -96,16 +116,8 @@ fn test_sync_produces_extractable_archive() {
     }
 
     let synced = tmp.path().join("synced.arx");
-    CrudArchive::sync_to_base(
-        &archive,
-        Some(&synced),
-        true,
-        0.05,
-        None,
-        [0u8; 32],
-        false,
-    )
-    .expect("sync_to_base failed");
+    CrudArchive::sync_to_base(&archive, Some(&synced), true, 0.05, None, [0u8; 32], false)
+        .expect("sync_to_base failed");
 
     let dst = TempDir::new().unwrap();
     extract(&synced, dst.path(), None).expect("extract of synced archive failed");

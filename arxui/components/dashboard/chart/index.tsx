@@ -77,40 +77,16 @@ export default function DashboardChart() {
           >
             <defs>
               <linearGradient id="fillSpendings" x1="0" y1="0" x2="0" y2="1">
-                <stop
-                  offset="5%"
-                  stopColor="var(--color-spendings)"
-                  stopOpacity={0.8}
-                />
-                <stop
-                  offset="95%"
-                  stopColor="var(--color-spendings)"
-                  stopOpacity={0.1}
-                />
+                <stop offset="5%" stopColor="var(--color-spendings)" stopOpacity={0.8} />
+                <stop offset="95%" stopColor="var(--color-spendings)" stopOpacity={0.1} />
               </linearGradient>
               <linearGradient id="fillSales" x1="0" y1="0" x2="0" y2="1">
-                <stop
-                  offset="5%"
-                  stopColor="var(--color-sales)"
-                  stopOpacity={0.8}
-                />
-                <stop
-                  offset="95%"
-                  stopColor="var(--color-sales)"
-                  stopOpacity={0.1}
-                />
+                <stop offset="5%" stopColor="var(--color-sales)" stopOpacity={0.8} />
+                <stop offset="95%" stopColor="var(--color-sales)" stopOpacity={0.1} />
               </linearGradient>
               <linearGradient id="fillCoffee" x1="0" y1="0" x2="0" y2="1">
-                <stop
-                  offset="5%"
-                  stopColor="var(--color-coffee)"
-                  stopOpacity={0.8}
-                />
-                <stop
-                  offset="95%"
-                  stopColor="var(--color-coffee)"
-                  stopOpacity={0.1}
-                />
+                <stop offset="5%" stopColor="var(--color-coffee)" stopOpacity={0.8} />
+                <stop offset="95%" stopColor="var(--color-coffee)" stopOpacity={0.1} />
               </linearGradient>
             </defs>
             <CartesianGrid
@@ -182,11 +158,7 @@ export default function DashboardChart() {
   };
 
   return (
-    <Tabs
-      value={activeTab}
-      onValueChange={handleTabChange}
-      className="max-md:gap-4"
-    >
+    <Tabs value={activeTab} onValueChange={handleTabChange} className="max-md:gap-4">
       <div className="flex items-center justify-between mb-4 max-md:contents">
         <TabsList className="max-md:w-full">
           <TabsTrigger value="week">WEEK</TabsTrigger>
@@ -212,13 +184,7 @@ export default function DashboardChart() {
   );
 }
 
-export const ChartLegend = ({
-  label,
-  color,
-}: {
-  label: string;
-  color: string;
-}) => {
+export const ChartLegend = ({ label, color }: { label: string; color: string }) => {
   return (
     <div className="flex items-center gap-2 uppercase">
       <Bullet style={{ backgroundColor: color }} className="rotate-45" />

@@ -44,14 +44,8 @@ export function MobileHeader({ mockData }: MobileHeaderProps) {
           </SheetTrigger>
 
           {/* Notifications Sheet */}
-          <SheetContent
-            closeButton={false}
-            side="right"
-            className="w-[80%] max-w-md p-0"
-          >
-            <MobileNotifications
-              initialNotifications={mockData.notifications}
-            />
+          <SheetContent closeButton={false} side="right" className="w-[80%] max-w-md p-0">
+            <MobileNotifications initialNotifications={mockData.notifications} />
           </SheetContent>
         </Sheet>
       </div>

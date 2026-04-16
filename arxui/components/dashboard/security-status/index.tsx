@@ -20,8 +20,9 @@ const securityStatusItemVariants = cva("border rounded-md ring-4", {
   },
 });
 
-interface SecurityStatusItemProps
-  extends VariantProps<typeof securityStatusItemVariants> {
+interface SecurityStatusItemProps extends VariantProps<
+  typeof securityStatusItemVariants
+> {
   title: string;
   value: string;
   status: string;

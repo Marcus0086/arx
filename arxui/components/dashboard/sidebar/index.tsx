@@ -16,11 +16,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import AtomIcon from "@/components/icons/atom";
 import BracketsIcon from "@/components/icons/brackets";
@@ -112,10 +108,7 @@ export function DashboardSidebar({
 
       <SidebarContent>
         {data.navMain.map((group, i) => (
-          <SidebarGroup
-            className={cn(i === 0 && "rounded-t-none")}
-            key={group.title}
-          >
+          <SidebarGroup className={cn(i === 0 && "rounded-t-none")} key={group.title}>
             <SidebarGroupLabel>
               <Bullet className="mr-2" />
               {group.title}
@@ -127,7 +120,7 @@ export function DashboardSidebar({
                     key={item.title}
                     className={cn(
                       item.locked && "pointer-events-none opacity-50",
-                      isV0 && "pointer-events-none"
+                      isV0 && "pointer-events-none",
                     )}
                     data-disabled={item.locked}
                   >
@@ -137,7 +130,7 @@ export function DashboardSidebar({
                       disabled={item.locked}
                       className={cn(
                         "disabled:cursor-not-allowed",
-                        item.locked && "pointer-events-none"
+                        item.locked && "pointer-events-none",
                       )}
                     >
                       {item.locked ? (

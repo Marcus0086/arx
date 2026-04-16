@@ -5,13 +5,7 @@ import { useSdk } from "@/src/lib/sdk-context";
 import { useAuthStore } from "@/src/stores/auth-store";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import {
-  Archive,
-  HardDrive,
-  LogOut,
-  ShieldCheck,
-  User,
-} from "lucide-react";
+import { Archive, HardDrive, LogOut, ShieldCheck, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {

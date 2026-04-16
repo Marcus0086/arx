@@ -23,7 +23,9 @@ pub fn write_table(mut w: impl Write, entries: &[ChunkEntry]) -> Result<()> {
     let mut buf = [0u8; ENTRY_SIZE];
     for e in entries {
         buf[0] = e.codec;
-        for b in &mut buf[1..8] { *b = 0; } // padding
+        for b in &mut buf[1..8] {
+            *b = 0;
+        } // padding
         buf[8..16].copy_from_slice(&e.u_size.to_le_bytes());
         buf[16..24].copy_from_slice(&e.c_size.to_le_bytes());
         buf[24..32].copy_from_slice(&e.data_off.to_le_bytes());
@@ -56,7 +58,10 @@ pub fn read_table_from_slice(buf: &[u8], count: u64) -> io::Result<Vec<ChunkEntr
             format!(
                 "chunk table size mismatch: got {} bytes for {} chunks \
                  (expected {} for v4 or {} for v3)",
-                buf.len(), count, expected_v4, expected_v3
+                buf.len(),
+                count,
+                expected_v4,
+                expected_v3
             ),
         ));
     };
@@ -74,7 +79,13 @@ pub fn read_table_from_slice(buf: &[u8], count: u64) -> io::Result<Vec<ChunkEntr
         } else {
             [0u8; 32]
         };
-        out.push(ChunkEntry { codec, u_size, c_size, data_off, blake3 });
+        out.push(ChunkEntry {
+            codec,
+            u_size,
+            c_size,
+            data_off,
+            blake3,
+        });
         off += entry_size;
     }
     Ok(out)
@@ -96,12 +107,12 @@ pub fn read_table(r: &mut &[u8], count: u64) -> Result<Vec<ChunkEntry>> {
         if dbg {
             eprintln!(
                 "[DBG] chunktab: insufficient bytes: have={}, need at least {} for {} entries",
-                r.len(), count as usize * ENTRY_SIZE_V3, count
+                r.len(),
+                count as usize * ENTRY_SIZE_V3,
+                count
             );
         }
-        return Err(
-            io::Error::new(io::ErrorKind::UnexpectedEof, "chunk table too small").into(),
-        );
+        return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "chunk table too small").into());
     };
 
     let need = count as usize * entry_size;
@@ -124,7 +135,13 @@ pub fn read_table(r: &mut &[u8], count: u64) -> Result<Vec<ChunkEntry>> {
             eprintln!("[DBG] CE[{i}]: codec={codec} u={u_size} c={c_size} off={data_off}");
         }
 
-        out.push(ChunkEntry { codec, u_size, c_size, data_off, blake3 });
+        out.push(ChunkEntry {
+            codec,
+            u_size,
+            c_size,
+            data_off,
+            blake3,
+        });
         off += entry_size;
     }
 
@@ -138,8 +155,20 @@ mod tests {
 
     fn sample() -> Vec<ChunkEntry> {
         vec![
-            ChunkEntry { codec: 0, u_size: 65536, c_size: 65536, data_off: 1000, blake3: [0x11; 32] },
-            ChunkEntry { codec: 1, u_size: 131072, c_size: 98304, data_off: 66536, blake3: [0x22; 32] },
+            ChunkEntry {
+                codec: 0,
+                u_size: 65536,
+                c_size: 65536,
+                data_off: 1000,
+                blake3: [0x11; 32],
+            },
+            ChunkEntry {
+                codec: 1,
+                u_size: 131072,
+                c_size: 98304,
+                data_off: 66536,
+                blake3: [0x22; 32],
+            },
         ]
     }
 
@@ -148,7 +177,11 @@ mod tests {
         let entries = sample();
         let mut buf = Vec::new();
         write_table(&mut buf, &entries).unwrap();
-        assert_eq!(buf.len(), entries.len() * ENTRY_SIZE, "each v4 entry is 64 bytes");
+        assert_eq!(
+            buf.len(),
+            entries.len() * ENTRY_SIZE,
+            "each v4 entry is 64 bytes"
+        );
 
         let back = read_table_from_slice(&buf, 2).unwrap();
         assert_eq!(back[0].codec, 0);
@@ -172,7 +205,10 @@ mod tests {
         let back = read_table_from_slice(&buf, 1).unwrap();
         assert_eq!(back[0].codec, 1);
         assert_eq!(back[0].u_size, 200);
-        assert_eq!(back[0].blake3, [0u8; 32], "v3 entries should have zero blake3");
+        assert_eq!(
+            back[0].blake3, [0u8; 32],
+            "v3 entries should have zero blake3"
+        );
     }
 
     #[test]

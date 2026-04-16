@@ -43,7 +43,7 @@ export default function ChatExpanded({
       <div className="flex-1 overflow-y-auto max-h-80">
         {conversations.map((conversation) => {
           const otherUser = conversation.participants.find(
-            (p) => p.id !== mockChatData.currentUser.id
+            (p) => p.id !== mockChatData.currentUser.id,
           );
           if (!otherUser) return null;
 

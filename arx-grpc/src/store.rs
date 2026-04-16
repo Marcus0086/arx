@@ -6,9 +6,9 @@ use uuid::Uuid;
 /// Resolved file paths for a single archive.
 pub struct ArchivePaths {
     pub dir: PathBuf,
-    pub data: PathBuf,   // data.arx
+    pub data: PathBuf,    // data.arx
     pub journal: PathBuf, // data.arx.log
-    pub delta: PathBuf,  // data.arx.delta
+    pub delta: PathBuf,   // data.arx.delta
 }
 
 /// Manages the on-disk storage layout for all tenants.
@@ -53,11 +53,7 @@ impl ArchiveStore {
     }
 
     /// Allocate a new archive directory and return its UUID.
-    pub fn new_archive(
-        &self,
-        tenant_id: &str,
-        _name: &str,
-    ) -> std::io::Result<String> {
+    pub fn new_archive(&self, tenant_id: &str, _name: &str) -> std::io::Result<String> {
         let id = Uuid::new_v4().to_string();
         let dir = self.archive_dir(tenant_id, &id);
         fs::create_dir_all(&dir)?;
@@ -66,11 +62,7 @@ impl ArchiveStore {
 
     /// Resolve archive ownership: returns the data.arx path if it exists and belongs
     /// to the tenant, otherwise returns an error.
-    pub fn resolve(
-        &self,
-        tenant_id: &str,
-        archive_id: &str,
-    ) -> Result<PathBuf, tonic::Status> {
+    pub fn resolve(&self, tenant_id: &str, archive_id: &str) -> Result<PathBuf, tonic::Status> {
         // Prevent path traversal
         if archive_id.contains('/') || archive_id.contains("..") {
             return Err(tonic::Status::invalid_argument("invalid archive_id"));
@@ -120,11 +112,7 @@ impl ArchiveStore {
     }
 
     /// Delete an archive and all its sidecars.
-    pub fn delete_archive(
-        &self,
-        tenant_id: &str,
-        archive_id: &str,
-    ) -> Result<(), tonic::Status> {
+    pub fn delete_archive(&self, tenant_id: &str, archive_id: &str) -> Result<(), tonic::Status> {
         if archive_id.contains('/') || archive_id.contains("..") {
             return Err(tonic::Status::invalid_argument("invalid archive_id"));
         }
@@ -134,7 +122,6 @@ impl ArchiveStore {
                 "archive {archive_id} not found"
             )));
         }
-        fs::remove_dir_all(&dir)
-            .map_err(|e| tonic::Status::internal(e.to_string()))
+        fs::remove_dir_all(&dir).map_err(|e| tonic::Status::internal(e.to_string()))
     }
 }

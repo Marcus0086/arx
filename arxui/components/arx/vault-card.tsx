@@ -20,9 +20,7 @@ interface VaultCardProps {
 export function VaultCard({ vault, onDelete }: VaultCardProps) {
   const router = useRouter();
 
-  const createdDate = vault.createdAt
-    ? new Date(vault.createdAt)
-    : null;
+  const createdDate = vault.createdAt ? new Date(vault.createdAt) : null;
 
   return (
     <div
@@ -62,9 +60,7 @@ export function VaultCard({ vault, onDelete }: VaultCardProps) {
       {/* Vault info */}
       <div className="space-y-1 flex-1">
         <p className="font-semibold text-sm leading-tight truncate">{vault.name}</p>
-        <p className="text-xs text-muted-foreground">
-          {formatBytes(vault.sizeBytes)}
-        </p>
+        <p className="text-xs text-muted-foreground">{formatBytes(vault.sizeBytes)}</p>
       </div>
 
       {/* Footer */}

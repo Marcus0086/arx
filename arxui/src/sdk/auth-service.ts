@@ -47,7 +47,11 @@ export class AuthService {
   async logout(): Promise<void> {
     const rt = this.store.getRefreshToken();
     if (rt) {
-      try { await this.client.logout({ refreshToken: rt }); } catch { /* ignore */ }
+      try {
+        await this.client.logout({ refreshToken: rt });
+      } catch {
+        /* ignore */
+      }
     }
     this.store.clear();
     // Clear presence cookie

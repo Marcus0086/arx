@@ -61,7 +61,7 @@ export default function MobileNotifications({
 
   const markAsRead = (id: string) => {
     setNotifications((prev) =>
-      prev.map((notif) => (notif.id === id ? { ...notif, read: true } : notif))
+      prev.map((notif) => (notif.id === id ? { ...notif, read: true } : notif)),
     );
   };
 
@@ -83,10 +83,7 @@ export default function MobileNotifications({
           <h2 className="text-sm font-medium uppercase">Notifications</h2>
         </div>
         <SheetClose>
-          <Badge
-            variant="secondary"
-            className="uppercase text-muted-foreground"
-          >
+          <Badge variant="secondary" className="uppercase text-muted-foreground">
             Close
           </Badge>
         </SheetClose>
@@ -114,9 +111,7 @@ export default function MobileNotifications({
                   x: { duration: 0.2 },
                 }}
               >
-                <SwipeableWrapper
-                  onDelete={() => deleteNotification(notification.id)}
-                >
+                <SwipeableWrapper onDelete={() => deleteNotification(notification.id)}>
                   <NotificationItem
                     notification={notification}
                     onMarkAsRead={markAsRead}

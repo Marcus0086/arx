@@ -71,11 +71,7 @@ export default function DashboardStat({
         <div className="flex items-center">
           <span className="text-4xl md:text-5xl font-display">
             {isNumeric ? (
-              <NumberFlow
-                value={numericValue}
-                prefix={prefix}
-                suffix={suffix}
-              />
+              <NumberFlow value={numericValue} prefix={prefix} suffix={suffix} />
             ) : (
               value
             )}
@@ -103,15 +99,13 @@ export default function DashboardStat({
                 "flex flex-col transition-all duration-500",
                 "group-hover:scale-105 group-hover:brightness-110",
                 getIntentClassName(),
-                direction === "up"
-                  ? "animate-marquee-up"
-                  : "animate-marquee-down"
+                direction === "up" ? "animate-marquee-up" : "animate-marquee-down",
               )}
             >
               <div
                 className={cn(
                   "flex",
-                  direction === "up" ? "flex-col-reverse" : "flex-col"
+                  direction === "up" ? "flex-col-reverse" : "flex-col",
                 )}
               >
                 {Array.from({ length: 6 }, (_, i) => (
@@ -121,7 +115,7 @@ export default function DashboardStat({
               <div
                 className={cn(
                   "flex",
-                  direction === "up" ? "flex-col-reverse" : "flex-col"
+                  direction === "up" ? "flex-col-reverse" : "flex-col",
                 )}
               >
                 {Array.from({ length: 6 }, (_, i) => (
@@ -157,7 +151,7 @@ const Arrow = ({ direction, index }: ArrowProps) => {
         "transition-all duration-700 ease-out",
         "animate-marquee-pulse",
 
-        "will-change-transform"
+        "will-change-transform",
       )}
     >
       {direction === "up" ? "↑" : "↓"}

@@ -70,7 +70,8 @@ impl Opened {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::Other,
                     "encrypted; --key/--key-salt required",
-                ).into());
+                )
+                .into());
             }
         } else {
             None
@@ -112,7 +113,8 @@ impl Opened {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
                     format!("chunk[{i}] out of bounds"),
-                ).into());
+                )
+                .into());
             }
         }
 

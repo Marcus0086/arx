@@ -34,12 +34,7 @@ export default function TVNoise({
       const height = rect.height * window.devicePixelRatio;
 
       // Only update canvas if we have valid dimensions
-      if (
-        width > 0 &&
-        height > 0 &&
-        Number.isFinite(width) &&
-        Number.isFinite(height)
-      ) {
+      if (width > 0 && height > 0 && Number.isFinite(width) && Number.isFinite(height)) {
         canvas.width = width;
         canvas.height = height;
         ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
@@ -114,10 +109,7 @@ export default function TVNoise({
   return (
     <canvas
       ref={canvasRef}
-      className={cn(
-        "pointer-events-none absolute inset-0 w-full h-full z-10",
-        className
-      )}
+      className={cn("pointer-events-none absolute inset-0 w-full h-full z-10", className)}
       style={{
         opacity,
         mixBlendMode: "overlay",

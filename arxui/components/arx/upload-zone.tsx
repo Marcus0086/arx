@@ -26,7 +26,7 @@ export function UploadZone({ children, onDrop, disabled }: UploadZoneProps) {
     onDrop: handleDrop,
     onDragEnter: () => setIsDragOver(true),
     onDragLeave: () => setIsDragOver(false),
-    noClick: true,      // don't open picker on click (we have a button for that)
+    noClick: true, // don't open picker on click (we have a button for that)
     noKeyboard: true,
     disabled,
   });

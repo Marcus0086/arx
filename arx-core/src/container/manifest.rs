@@ -82,7 +82,11 @@ mod tests {
                 u_size: 12,
                 chunk_refs: vec![ChunkRef { id: 0, u_size: 12 }],
             }],
-            dirs: vec![DirEntry { path: "subdir".into(), mode: 0o755, mtime: 0 }],
+            dirs: vec![DirEntry {
+                path: "subdir".into(),
+                mode: 0o755,
+                mtime: 0,
+            }],
             meta: Meta {
                 created: 1_700_000_000,
                 tool: "arx 0.1.0".into(),
@@ -107,8 +111,16 @@ mod tests {
     #[test]
     fn test_old_manifest_compat() {
         // Simulate deserializing a pre-symlink manifest (no symlinks field)
-        let m = Manifest { files: vec![], dirs: vec![], meta: Meta::default(), symlinks: vec![] };
+        let m = Manifest {
+            files: vec![],
+            dirs: vec![],
+            meta: Meta::default(),
+            symlinks: vec![],
+        };
         let back = roundtrip(&m);
-        assert!(back.symlinks.is_empty(), "missing symlinks field should default to empty");
+        assert!(
+            back.symlinks.is_empty(),
+            "missing symlinks field should default to empty"
+        );
     }
 }

@@ -18,7 +18,11 @@ fn corrupt_byte_in_data_region(archive_path: &std::path::Path) {
 
     // Flip a byte somewhere inside the data region (read+write)
     let flip_offset = sb.data_off + 4;
-    let mut f = OpenOptions::new().read(true).write(true).open(archive_path).unwrap();
+    let mut f = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(archive_path)
+        .unwrap();
     f.seek(SeekFrom::Start(flip_offset)).unwrap();
     let mut buf = [0u8; 1];
     f.read_exact(&mut buf).unwrap();
@@ -59,12 +63,26 @@ fn test_corrupted_encrypted_chunk_fails_on_aead() {
     let archive = tmp.path().join("enc_corrupt.arx");
     let key = [0xDEu8; 32];
 
-    pack(&[src.path()], &archive, Some(&PackOptions { aead_key: Some(key), ..Default::default() })).unwrap();
+    pack(
+        &[src.path()],
+        &archive,
+        Some(&PackOptions {
+            aead_key: Some(key),
+            ..Default::default()
+        }),
+    )
+    .unwrap();
     corrupt_byte_in_data_region(&archive);
 
-    let ext_opts = ExtractOptions { aead_key: Some(key), ..Default::default() };
+    let ext_opts = ExtractOptions {
+        aead_key: Some(key),
+        ..Default::default()
+    };
     let result = extract(&archive, dst.path(), Some(&ext_opts));
-    assert!(result.is_err(), "extracting tampered encrypted chunk should fail");
+    assert!(
+        result.is_err(),
+        "extracting tampered encrypted chunk should fail"
+    );
 }
 
 #[test]

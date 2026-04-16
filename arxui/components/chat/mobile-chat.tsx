@@ -20,8 +20,7 @@ export function MobileChat() {
   const hasNewMessages = totalUnreadCount > 0;
 
   // Sheet should be open for both "expanded" and "conversation" states
-  const isOpen =
-    chatState.state === "expanded" || chatState.state === "conversation";
+  const isOpen = chatState.state === "expanded" || chatState.state === "conversation";
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
@@ -41,10 +40,7 @@ export function MobileChat() {
     <Sheet open={isOpen} onOpenChange={handleOpenChange} defaultOpen={false}>
       {/* Floating CTA Button - Styled like collapsed desktop chat */}
       <SheetTrigger asChild>
-        <Button
-          size="xl"
-          className="pl-3 fixed gap-4 bottom-4 right-4 z-40 md:hidden"
-        >
+        <Button size="xl" className="pl-3 fixed gap-4 bottom-4 right-4 z-40 md:hidden">
           {/* Status Indicator */}
           <ChatStatusIndicator
             isExpanded={false}
@@ -54,19 +50,13 @@ export function MobileChat() {
 
           {/* Title */}
           <span>
-            {hasNewMessages
-              ? `New Message${totalUnreadCount > 1 ? "s" : ""}`
-              : "Chat"}
+            {hasNewMessages ? `New Message${totalUnreadCount > 1 ? "s" : ""}` : "Chat"}
           </span>
         </Button>
       </SheetTrigger>
 
       {/* Chat Drawer */}
-      <SheetContent
-        side="bottom"
-        className="h-[85vh] p-0 md:hidden"
-        closeButton={false}
-      >
+      <SheetContent side="bottom" className="h-[85vh] p-0 md:hidden" closeButton={false}>
         <SheetHeader className="sr-only">
           <SheetTitle>Chat</SheetTitle>
         </SheetHeader>

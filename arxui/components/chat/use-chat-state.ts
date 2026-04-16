@@ -41,7 +41,7 @@ const chatStore = create<ChatStore>((set, get) => ({
   handleSendMessage: () => {
     const { newMessage, conversations, chatState } = get();
     const activeConv = conversations.find(
-      (conv) => conv.id === chatState.activeConversation
+      (conv) => conv.id === chatState.activeConversation,
     );
 
     if (!newMessage.trim() || !activeConv) return;
@@ -61,7 +61,7 @@ const chatStore = create<ChatStore>((set, get) => ({
             messages: [...conv.messages, message],
             lastMessage: message,
           }
-        : conv
+        : conv,
     );
 
     set({
@@ -80,7 +80,7 @@ const chatStore = create<ChatStore>((set, get) => ({
 
     // Mark conversation as read
     const updatedConversations = conversations.map((conv) =>
-      conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv
+      conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv,
     );
 
     set({ conversations: updatedConversations });
@@ -121,11 +121,11 @@ export const useChatState = () => {
   // Computed values
   const totalUnreadCount = conversations.reduce(
     (total, conv) => total + conv.unreadCount,
-    0
+    0,
   );
 
   const activeConversation = conversations.find(
-    (conv) => conv.id === chatState.activeConversation
+    (conv) => conv.id === chatState.activeConversation,
   );
 
   return {

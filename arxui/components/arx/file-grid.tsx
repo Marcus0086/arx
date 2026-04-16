@@ -10,15 +10,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import {
-  Download,
-  Film,
-  FileText,
-  Image,
-  Music,
-  Package,
-  Trash2,
-} from "lucide-react";
+import { Download, Film, FileText, Image, Music, Package, Trash2 } from "lucide-react";
 import type { FileEntry } from "@/src/sdk";
 import { formatDistanceToNow } from "date-fns";
 
@@ -69,7 +61,14 @@ function getExt(path: string) {
   return path.split(".").pop()?.toLowerCase() ?? "";
 }
 
-function FileItem({ vaultId, file, selected, onSelect, onDownload, onDelete }: FileItemProps) {
+function FileItem({
+  vaultId,
+  file,
+  selected,
+  onSelect,
+  onDownload,
+  onDelete,
+}: FileItemProps) {
   const ext = getExt(file.path);
   const isImage = IMAGE_EXTS.has(ext);
   const isVideo = VIDEO_EXTS.has(ext);
@@ -106,18 +105,16 @@ function FileItem({ vaultId, file, selected, onSelect, onDownload, onDelete }: F
           <div className="aspect-square rounded-lg overflow-hidden flex items-center justify-center bg-muted/40">
             {isImage && previewUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={previewUrl}
-                alt={name}
-                className="w-full h-full object-cover"
-              />
+              <img src={previewUrl} alt={name} className="w-full h-full object-cover" />
             ) : isVideo ? (
               <Film className="w-8 h-8 text-muted-foreground/50" />
             ) : AUDIO_EXTS.has(ext) ? (
               <Music className="w-8 h-8 text-muted-foreground/50" />
             ) : ARCHIVE_EXTS.has(ext) ? (
               <Package className="w-8 h-8 text-muted-foreground/50" />
-            ) : ["txt", "md", "json", "yaml", "toml", "rs", "ts", "tsx", "js"].includes(ext) ? (
+            ) : ["txt", "md", "json", "yaml", "toml", "rs", "ts", "tsx", "js"].includes(
+                ext,
+              ) ? (
               <FileText className="w-8 h-8 text-muted-foreground/50" />
             ) : (
               <Image className="w-8 h-8 text-muted-foreground/50" />
@@ -127,9 +124,7 @@ function FileItem({ vaultId, file, selected, onSelect, onDownload, onDelete }: F
           {/* Name & size */}
           <div className="space-y-0.5 min-w-0">
             <p className="text-xs font-medium truncate leading-tight">{name}</p>
-            <p className="text-[10px] text-muted-foreground">
-              {formatBytes(file.size)}
-            </p>
+            <p className="text-[10px] text-muted-foreground">{formatBytes(file.size)}</p>
           </div>
         </div>
       </ContextMenuTrigger>

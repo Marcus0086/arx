@@ -54,7 +54,13 @@ export class VaultService {
         : undefined,
     });
     if (res.error) throw new Error(res.error);
-    return { id: res.archiveId, name: opts.name, sizeBytes: 0n, createdAt: new Date().toISOString(), encrypted: !!opts.password };
+    return {
+      id: res.archiveId,
+      name: opts.name,
+      sizeBytes: 0n,
+      createdAt: new Date().toISOString(),
+      encrypted: !!opts.password,
+    };
   }
 
   async delete(vaultId: string): Promise<void> {

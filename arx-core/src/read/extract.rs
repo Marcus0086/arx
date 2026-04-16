@@ -219,7 +219,10 @@ fn resolve_enc(
         return Ok(None);
     }
     let o = opts.ok_or_else(|| {
-        std::io::Error::new(std::io::ErrorKind::Other, "archive is encrypted; key required")
+        std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "archive is encrypted; key required",
+        )
     })?;
 
     // Raw key takes precedence over password
@@ -230,7 +233,11 @@ fn resolve_enc(
         let key = crate::crypto::kdf::derive_key(pw, &sb.kdf_salt);
         return Ok(Some((AeadKey(key), sb.kdf_salt)));
     }
-    Err(std::io::Error::new(std::io::ErrorKind::Other, "missing key or password for encrypted archive").into())
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        "missing key or password for encrypted archive",
+    )
+    .into())
 }
 
 fn decompress_chunk(comp: &[u8], codec: u8, u_size: u64, buf: &mut Vec<u8>) -> Result<Vec<u8>> {
@@ -241,7 +248,9 @@ fn decompress_chunk(comp: &[u8], codec: u8, u_size: u64, buf: &mut Vec<u8>) -> R
             let mut out = Vec::with_capacity(u_size as usize);
             loop {
                 let k = dec.read(buf)?;
-                if k == 0 { break; }
+                if k == 0 {
+                    break;
+                }
                 out.extend_from_slice(&buf[..k]);
             }
             Ok(out)

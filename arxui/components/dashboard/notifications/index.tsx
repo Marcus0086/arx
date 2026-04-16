@@ -13,21 +13,17 @@ interface NotificationsProps {
   initialNotifications: Notification[];
 }
 
-export default function Notifications({
-  initialNotifications,
-}: NotificationsProps) {
+export default function Notifications({ initialNotifications }: NotificationsProps) {
   const [notifications, setNotifications] =
     useState<Notification[]>(initialNotifications);
   const [showAll, setShowAll] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
-  const displayedNotifications = showAll
-    ? notifications
-    : notifications.slice(0, 3);
+  const displayedNotifications = showAll ? notifications : notifications.slice(0, 3);
 
   const markAsRead = (id: string) => {
     setNotifications((prev) =>
-      prev.map((notif) => (notif.id === id ? { ...notif, read: true } : notif))
+      prev.map((notif) => (notif.id === id ? { ...notif, read: true } : notif)),
     );
   };
 
@@ -80,9 +76,7 @@ export default function Notifications({
 
             {notifications.length === 0 && (
               <div className="text-center py-8">
-                <p className="text-sm text-muted-foreground">
-                  No notifications
-                </p>
+                <p className="text-sm text-muted-foreground">No notifications</p>
               </div>
             )}
 

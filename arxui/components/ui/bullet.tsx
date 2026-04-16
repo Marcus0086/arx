@@ -23,14 +23,10 @@ export const bulletVariants = cva("rounded-[1.5px]", {
 });
 
 export interface BulletProps
-  extends VariantProps<typeof bulletVariants>,
-    HTMLAttributes<HTMLDivElement> {}
+  extends VariantProps<typeof bulletVariants>, HTMLAttributes<HTMLDivElement> {}
 
 export const Bullet = ({ variant, size, className, ...props }: BulletProps) => {
   return (
-    <div
-      className={cn(bulletVariants({ variant, size }), className)}
-      {...props}
-    ></div>
+    <div className={cn(bulletVariants({ variant, size }), className)} {...props}></div>
   );
 };

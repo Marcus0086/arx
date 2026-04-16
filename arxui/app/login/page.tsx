@@ -51,9 +51,7 @@ function LoginForm() {
           <Lock className="w-4 h-4" />
           Sign in
         </CardTitle>
-        <CardDescription>
-          Enter your credentials to access your vaults
-        </CardDescription>
+        <CardDescription>Enter your credentials to access your vaults</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -117,13 +115,13 @@ export default function LoginPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">ARX Drive</h1>
-            <p className="text-sm text-muted-foreground">
-              Encrypted archive storage
-            </p>
+            <p className="text-sm text-muted-foreground">Encrypted archive storage</p>
           </div>
         </div>
 
-        <Suspense fallback={<div className="h-48 rounded-xl bg-muted/40 animate-pulse" />}>
+        <Suspense
+          fallback={<div className="h-48 rounded-xl bg-muted/40 animate-pulse" />}
+        >
           <LoginForm />
         </Suspense>
 

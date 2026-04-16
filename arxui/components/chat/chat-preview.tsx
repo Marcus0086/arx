@@ -14,7 +14,7 @@ export default function ChatPreview({
   onOpenConversation,
 }: ChatPreviewProps) {
   const user = conversation.participants.find(
-    (p) => p.id !== mockChatData.currentUser.id
+    (p) => p.id !== mockChatData.currentUser.id,
   );
 
   if (!user) return null;
@@ -52,7 +52,7 @@ export default function ChatPreview({
         <p
           className={cn(
             "text-sm text-foreground/70 truncate mt-1",
-            conversation.unreadCount > 0 && "font-bold text-foreground"
+            conversation.unreadCount > 0 && "font-bold text-foreground",
           )}
         >
           {conversation.lastMessage.content}

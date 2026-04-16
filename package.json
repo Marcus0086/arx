@@ -1,0 +1,23 @@
+{
+  "name": "arx-workspace",
+  "private": true,
+  "description": "Dev-tooling root: Husky, lint-staged, Prettier",
+  "scripts": {
+    "prepare": "husky",
+    "format": "prettier --write \"arxui/**/*.{ts,tsx,js,jsx,json,css,md}\" && cargo fmt --all",
+    "format:check": "prettier --check \"arxui/**/*.{ts,tsx,js,jsx,json,css,md}\" && cargo fmt --all -- --check"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.1",
+    "prettier": "^3.5.3"
+  },
+  "lint-staged": {
+    "arxui/**/*.{ts,tsx,js,jsx,json,css,md}": [
+      "prettier --write"
+    ],
+    "**/*.rs": [
+      "rustfmt"
+    ]
+  }
+}

@@ -48,10 +48,9 @@ fn resolve_key(archive_path: &Path, key: Option<&KeyMaterial>) -> Result<Option<
         }
         Some(key_material::KeySource::Password(pw)) => {
             // Read kdf_salt from the archive's superblock
-            let mut f = std::fs::File::open(archive_path)
-                .map_err(|e| Status::internal(e.to_string()))?;
-            let sb = Superblock::read_from(&mut f)
-                .map_err(|e| Status::internal(e.to_string()))?;
+            let mut f =
+                std::fs::File::open(archive_path).map_err(|e| Status::internal(e.to_string()))?;
+            let sb = Superblock::read_from(&mut f).map_err(|e| Status::internal(e.to_string()))?;
             Ok(Some(derive_key(pw, &sb.kdf_salt)))
         }
         None => Ok(None),
@@ -94,7 +93,10 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<Streaming<UploadFrame>>,
     ) -> Result<Response<PackResponse>, Status> {
-        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
+        let tenant_id = {
+            let _t = extract_bearer(&request)?;
+            extract_tenant(&_t, &self.db).await?
+        };
         let mut stream = request.into_inner();
 
         // First frame must be PackHeader
@@ -107,7 +109,9 @@ impl ArxService for ArxServiceImpl {
             _ => return Err(Status::invalid_argument("first frame must be PackHeader")),
         };
 
-        let archive_id = self.store.new_archive(&tenant_id, &header.archive_name)
+        let archive_id = self
+            .store
+            .new_archive(&tenant_id, &header.archive_name)
             .map_err(|e| Status::internal(e.to_string()))?;
         let paths = self.store.archive_paths(&tenant_id, &archive_id);
 
@@ -133,7 +137,8 @@ impl ArxService for ArxServiceImpl {
                 Some(upload_frame::Payload::Data(bytes)) => {
                     if let Some((_, ref mut f)) = current_file {
                         use std::io::Write;
-                        f.write_all(&bytes).map_err(|e| Status::internal(e.to_string()))?;
+                        f.write_all(&bytes)
+                            .map_err(|e| Status::internal(e.to_string()))?;
                     }
                 }
                 Some(upload_frame::Payload::Finalize(_)) => break,
@@ -148,12 +153,28 @@ impl ArxService for ArxServiceImpl {
 
         let opts = PackOptions {
             deterministic: header.deterministic,
-            min_gain: if header.min_gain > 0.0 { header.min_gain } else { 0.05 },
+            min_gain: if header.min_gain > 0.0 {
+                header.min_gain
+            } else {
+                0.05
+            },
             aead_key,
             password,
-            meta_label: if header.label.is_empty() { None } else { Some(header.label) },
-            meta_owner: if header.owner.is_empty() { None } else { Some(header.owner) },
-            meta_notes: if header.notes.is_empty() { None } else { Some(header.notes) },
+            meta_label: if header.label.is_empty() {
+                None
+            } else {
+                Some(header.label)
+            },
+            meta_owner: if header.owner.is_empty() {
+                None
+            } else {
+                Some(header.owner)
+            },
+            meta_notes: if header.notes.is_empty() {
+                None
+            } else {
+                Some(header.notes)
+            },
             ..Default::default()
         };
 
@@ -178,18 +199,25 @@ impl ArxService for ArxServiceImpl {
     }
 
     // ── List ─────────────────────────────────────────────────────────────────
-    async fn list(
-        &self,
-        request: Request<ListRequest>,
-    ) -> Result<Response<ListResponse>, Status> {
-        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
+    async fn list(&self, request: Request<ListRequest>) -> Result<Response<ListResponse>, Status> {
+        let tenant_id = {
+            let _t = extract_bearer(&request)?;
+            extract_tenant(&_t, &self.db).await?
+        };
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
-        let opts = aead_key.map(|k| ListOptions { aead_key: Some(k), key_salt: [0u8; 32] });
+        let opts = aead_key.map(|k| ListOptions {
+            aead_key: Some(k),
+            key_salt: [0u8; 32],
+        });
 
         // Use the repo to get entries
-        let params = OpenParams { archive_path: archive_path.clone(), aead_key: opts.as_ref().and_then(|o| o.aead_key), key_salt: [0u8; 32] };
+        let params = OpenParams {
+            archive_path: archive_path.clone(),
+            aead_key: opts.as_ref().and_then(|o| o.aead_key),
+            key_salt: [0u8; 32],
+        };
         let repo = open_repo(Backend::Fs, params).map_err(arx_err)?;
         let files = repo.list_files().map_err(arx_err)?;
 
@@ -213,7 +241,10 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<ExtractRequest>,
     ) -> Result<Response<Self::ExtractStreamStream>, Status> {
-        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
+        let tenant_id = {
+            let _t = extract_bearer(&request)?;
+            extract_tenant(&_t, &self.db).await?
+        };
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
@@ -221,7 +252,11 @@ impl ArxService for ArxServiceImpl {
         let (tx, rx) = mpsc::channel(16);
 
         tokio::task::spawn_blocking(move || {
-            let params = OpenParams { archive_path: archive_path.clone(), aead_key, key_salt: [0u8; 32] };
+            let params = OpenParams {
+                archive_path: archive_path.clone(),
+                aead_key,
+                key_salt: [0u8; 32],
+            };
             let repo = match open_repo(Backend::Fs, params) {
                 Ok(r) => r,
                 Err(e) => {
@@ -232,7 +267,10 @@ impl ArxService for ArxServiceImpl {
 
             let files = match repo.list_files() {
                 Ok(f) => f,
-                Err(e) => { let _ = tx.blocking_send(Err(arx_err(e))); return; }
+                Err(e) => {
+                    let _ = tx.blocking_send(Err(arx_err(e)));
+                    return;
+                }
             };
 
             for file in files {
@@ -253,7 +291,10 @@ impl ArxService for ArxServiceImpl {
                 let len = if req.len == 0 { u64::MAX / 4 } else { req.len };
                 let mut reader = match repo.open_range(&file.path, start, len) {
                     Ok(r) => r,
-                    Err(e) => { let _ = tx.blocking_send(Err(arx_err(e))); return; }
+                    Err(e) => {
+                        let _ = tx.blocking_send(Err(arx_err(e)));
+                        return;
+                    }
                 };
                 let mut buf = vec![0u8; 512 * 1024];
                 loop {
@@ -265,7 +306,9 @@ impl ArxService for ArxServiceImpl {
                             return;
                         }
                     };
-                    if n == 0 { break; }
+                    if n == 0 {
+                        break;
+                    }
                     let _ = tx.blocking_send(Ok(DownloadFrame {
                         payload: Some(download_frame::Payload::Data(buf[..n].to_vec())),
                     }));
@@ -281,18 +324,30 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<VerifyRequest>,
     ) -> Result<Response<VerifyResponse>, Status> {
-        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
+        let tenant_id = {
+            let _t = extract_bearer(&request)?;
+            extract_tenant(&_t, &self.db).await?
+        };
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
-        let opts = aead_key.map(|k| ExtractOptions { aead_key: Some(k), ..Default::default() });
+        let opts = aead_key.map(|k| ExtractOptions {
+            aead_key: Some(k),
+            ..Default::default()
+        });
 
         match tokio::task::spawn_blocking(move || verify(&archive_path, opts.as_ref()))
             .await
             .map_err(|e| Status::internal(e.to_string()))?
         {
-            Ok(()) => Ok(Response::new(VerifyResponse { ok: true, error: String::new() })),
-            Err(e) => Ok(Response::new(VerifyResponse { ok: false, error: e.to_string() })),
+            Ok(()) => Ok(Response::new(VerifyResponse {
+                ok: true,
+                error: String::new(),
+            })),
+            Err(e) => Ok(Response::new(VerifyResponse {
+                ok: false,
+                error: e.to_string(),
+            })),
         }
     }
 
@@ -301,11 +356,16 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<IssueRequest>,
     ) -> Result<Response<IssueResponse>, Status> {
-        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
+        let tenant_id = {
+            let _t = extract_bearer(&request)?;
+            extract_tenant(&_t, &self.db).await?
+        };
         let req = request.into_inner();
         let aead_key = resolve_key_no_archive(req.key.as_ref())?;
 
-        let archive_id = self.store.new_archive(&tenant_id, &req.archive_name)
+        let archive_id = self
+            .store
+            .new_archive(&tenant_id, &req.archive_name)
             .map_err(|e| Status::internal(e.to_string()))?;
         let paths = self.store.archive_paths(&tenant_id, &archive_id);
 
@@ -324,7 +384,10 @@ impl ArxService for ArxServiceImpl {
         .map_err(|e| Status::internal(e.to_string()))?
         .map_err(arx_err)?;
 
-        Ok(Response::new(IssueResponse { archive_id, error: String::new() }))
+        Ok(Response::new(IssueResponse {
+            archive_id,
+            error: String::new(),
+        }))
     }
 
     // ── CrudAddStream ────────────────────────────────────────────────────────
@@ -332,10 +395,15 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<Streaming<UploadFrame>>,
     ) -> Result<Response<CrudAddResponse>, Status> {
-        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
+        let tenant_id = {
+            let _t = extract_bearer(&request)?;
+            extract_tenant(&_t, &self.db).await?
+        };
         let mut stream = request.into_inner();
 
-        let first = stream.message().await?
+        let first = stream
+            .message()
+            .await?
             .ok_or_else(|| Status::invalid_argument("empty stream"))?;
         let header = match first.payload {
             Some(upload_frame::Payload::CrudHeader(h)) => h,
@@ -368,7 +436,8 @@ impl ArxService for ArxServiceImpl {
                 Some(upload_frame::Payload::Data(bytes)) => {
                     if let Some((_, _, ref mut f, _, _)) = current {
                         use std::io::Write;
-                        f.write_all(&bytes).map_err(|e| Status::internal(e.to_string()))?;
+                        f.write_all(&bytes)
+                            .map_err(|e| Status::internal(e.to_string()))?;
                     }
                 }
                 Some(upload_frame::Payload::Finalize(_)) => {
@@ -393,7 +462,10 @@ impl ArxService for ArxServiceImpl {
         .map_err(|e| Status::internal(e.to_string()))?
         .map_err(arx_err)?;
 
-        Ok(Response::new(CrudAddResponse { ok: true, error: String::new() }))
+        Ok(Response::new(CrudAddResponse {
+            ok: true,
+            error: String::new(),
+        }))
     }
 
     // ── CrudRm ───────────────────────────────────────────────────────────────
@@ -401,7 +473,10 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<CrudRmRequest>,
     ) -> Result<Response<CrudRmResponse>, Status> {
-        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
+        let tenant_id = {
+            let _t = extract_bearer(&request)?;
+            extract_tenant(&_t, &self.db).await?
+        };
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
@@ -410,14 +485,21 @@ impl ArxService for ArxServiceImpl {
 
         tokio::task::spawn_blocking(move || -> arx_core::error::Result<()> {
             let mut arc = CrudArchive::open_with_crypto(&archive_path, aead_key, [0u8; 32])?;
-            if recursive { arc.delete_path_recursive(&path)? } else { arc.delete_path(&path)? }
+            if recursive {
+                arc.delete_path_recursive(&path)?
+            } else {
+                arc.delete_path(&path)?
+            }
             Ok(())
         })
         .await
         .map_err(|e| Status::internal(e.to_string()))?
         .map_err(arx_err)?;
 
-        Ok(Response::new(CrudRmResponse { ok: true, error: String::new() }))
+        Ok(Response::new(CrudRmResponse {
+            ok: true,
+            error: String::new(),
+        }))
     }
 
     // ── CrudMv ───────────────────────────────────────────────────────────────
@@ -425,7 +507,10 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<CrudMvRequest>,
     ) -> Result<Response<CrudMvResponse>, Status> {
-        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
+        let tenant_id = {
+            let _t = extract_bearer(&request)?;
+            extract_tenant(&_t, &self.db).await?
+        };
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
@@ -438,7 +523,10 @@ impl ArxService for ArxServiceImpl {
         .map_err(|e| Status::internal(e.to_string()))?
         .map_err(arx_err)?;
 
-        Ok(Response::new(CrudMvResponse { ok: true, error: String::new() }))
+        Ok(Response::new(CrudMvResponse {
+            ok: true,
+            error: String::new(),
+        }))
     }
 
     // ── CrudLs ───────────────────────────────────────────────────────────────
@@ -446,22 +534,33 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<CrudLsRequest>,
     ) -> Result<Response<CrudLsResponse>, Status> {
-        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
+        let tenant_id = {
+            let _t = extract_bearer(&request)?;
+            extract_tenant(&_t, &self.db).await?
+        };
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
         let prefix = req.prefix.clone();
 
-        let entries = tokio::task::spawn_blocking(move || -> arx_core::error::Result<Vec<CrudLsEntry>> {
-            let arc = CrudArchive::open_with_crypto(&archive_path, aead_key, [0u8; 32])?;
-            Ok(arc.index.by_path.iter()
-                .filter(|(p, _)| prefix.is_empty() || p.starts_with(&prefix))
-                .map(|(p, e)| CrudLsEntry { path: p.clone(), size: e.size, mtime: e.mtime })
-                .collect())
-        })
-        .await
-        .map_err(|e| Status::internal(e.to_string()))?
-        .map_err(arx_err)?;
+        let entries =
+            tokio::task::spawn_blocking(move || -> arx_core::error::Result<Vec<CrudLsEntry>> {
+                let arc = CrudArchive::open_with_crypto(&archive_path, aead_key, [0u8; 32])?;
+                Ok(arc
+                    .index
+                    .by_path
+                    .iter()
+                    .filter(|(p, _)| prefix.is_empty() || p.starts_with(&prefix))
+                    .map(|(p, e)| CrudLsEntry {
+                        path: p.clone(),
+                        size: e.size,
+                        mtime: e.mtime,
+                    })
+                    .collect())
+            })
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?
+            .map_err(arx_err)?;
 
         Ok(Response::new(CrudLsResponse { entries }))
     }
@@ -471,13 +570,18 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<CrudSyncRequest>,
     ) -> Result<Response<CrudSyncResponse>, Status> {
-        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
+        let tenant_id = {
+            let _t = extract_bearer(&request)?;
+            extract_tenant(&_t, &self.db).await?
+        };
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
 
         // New archive for the compacted result
-        let new_id = self.store.new_archive(&tenant_id, "synced")
+        let new_id = self
+            .store
+            .new_archive(&tenant_id, "synced")
             .map_err(|e| Status::internal(e.to_string()))?;
         let new_paths = self.store.archive_paths(&tenant_id, &new_id);
         let new_out = new_paths.data.clone();
@@ -497,7 +601,10 @@ impl ArxService for ArxServiceImpl {
         .map_err(|e| Status::internal(e.to_string()))?
         .map_err(arx_err)?;
 
-        Ok(Response::new(CrudSyncResponse { new_archive_id: new_id, error: String::new() }))
+        Ok(Response::new(CrudSyncResponse {
+            new_archive_id: new_id,
+            error: String::new(),
+        }))
     }
 
     // ── CrudDiff ─────────────────────────────────────────────────────────────
@@ -505,18 +612,29 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<CrudDiffRequest>,
     ) -> Result<Response<CrudDiffResponse>, Status> {
-        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
+        let tenant_id = {
+            let _t = extract_bearer(&request)?;
+            extract_tenant(&_t, &self.db).await?
+        };
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
 
-        let entries = tokio::task::spawn_blocking(move || -> arx_core::error::Result<Vec<CrudDiffEntry>> {
-            let arc = CrudArchive::open_with_crypto(&archive_path, aead_key, [0u8; 32])?;
-            Ok(arc.diff().into_iter().map(|e| CrudDiffEntry { kind: e.kind.to_string(), path: e.path }).collect())
-        })
-        .await
-        .map_err(|e| Status::internal(e.to_string()))?
-        .map_err(arx_err)?;
+        let entries =
+            tokio::task::spawn_blocking(move || -> arx_core::error::Result<Vec<CrudDiffEntry>> {
+                let arc = CrudArchive::open_with_crypto(&archive_path, aead_key, [0u8; 32])?;
+                Ok(arc
+                    .diff()
+                    .into_iter()
+                    .map(|e| CrudDiffEntry {
+                        kind: e.kind.to_string(),
+                        path: e.path,
+                    })
+                    .collect())
+            })
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?
+            .map_err(arx_err)?;
 
         Ok(Response::new(CrudDiffResponse { entries }))
     }
@@ -526,21 +644,31 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<ChunkMapRequest>,
     ) -> Result<Response<ChunkMapResponse>, Status> {
-        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
+        let tenant_id = {
+            let _t = extract_bearer(&request)?;
+            extract_tenant(&_t, &self.db).await?
+        };
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
-        let params = OpenParams { archive_path, aead_key, key_salt: [0u8; 32] };
+        let params = OpenParams {
+            archive_path,
+            aead_key,
+            key_salt: [0u8; 32],
+        };
         let repo = open_repo(Backend::Fs, params).map_err(arx_err)?;
         let rows = repo.chunk_map(&req.path).map_err(arx_err)?;
-        let entries = rows.into_iter().map(|r| ChunkMapEntry {
-            ordinal: r.ordinal,
-            id: r.id,
-            codec: r.codec as u32,
-            u_len: r.u_len,
-            c_len: r.c_len,
-            data_off: r.data_off,
-        }).collect();
+        let entries = rows
+            .into_iter()
+            .map(|r| ChunkMapEntry {
+                ordinal: r.ordinal,
+                id: r.id,
+                codec: r.codec as u32,
+                u_len: r.u_len,
+                c_len: r.c_len,
+                data_off: r.data_off,
+            })
+            .collect();
         Ok(Response::new(ChunkMapResponse { entries }))
     }
 
@@ -549,7 +677,10 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<ListArchivesReq>,
     ) -> Result<Response<ListArchivesResp>, Status> {
-        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
+        let tenant_id = {
+            let _t = extract_bearer(&request)?;
+            extract_tenant(&_t, &self.db).await?
+        };
         let archives = self.store.list_archives(&tenant_id);
         Ok(Response::new(ListArchivesResp { archives }))
     }
@@ -559,24 +690,39 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<DeleteArchiveReq>,
     ) -> Result<Response<DeleteArchiveResp>, Status> {
-        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
+        let tenant_id = {
+            let _t = extract_bearer(&request)?;
+            extract_tenant(&_t, &self.db).await?
+        };
         let req = request.into_inner();
         self.store.delete_archive(&tenant_id, &req.archive_id)?;
-        Ok(Response::new(DeleteArchiveResp { ok: true, error: String::new() }))
+        Ok(Response::new(DeleteArchiveResp {
+            ok: true,
+            error: String::new(),
+        }))
     }
 
     // ── Login ────────────────────────────────────────────────────────────────
-    async fn login(&self, request: Request<LoginRequest>) -> Result<Response<LoginResponse>, Status> {
+    async fn login(
+        &self,
+        request: Request<LoginRequest>,
+    ) -> Result<Response<LoginResponse>, Status> {
         let req = request.into_inner();
-        let (user_id, tenant_id) = self.db
+        let (user_id, tenant_id) = self
+            .db
             .verify_login(&req.email, &req.password)
             .await
             .map_err(|e| Status::internal(e))?
             .ok_or_else(|| Status::unauthenticated("invalid email or password"))?;
 
-        let secret = self.db.get_jwt_secret().await.map_err(|e| Status::internal(e))?;
+        let secret = self
+            .db
+            .get_jwt_secret()
+            .await
+            .map_err(|e| Status::internal(e))?;
         let access_token = issue_jwt(&user_id, &tenant_id, &secret)?;
-        let refresh_token = self.db
+        let refresh_token = self
+            .db
             .create_refresh_token(&user_id, &tenant_id)
             .await
             .map_err(|e| Status::internal(e))?;
@@ -595,15 +741,21 @@ impl ArxService for ArxServiceImpl {
         request: Request<RefreshTokenRequest>,
     ) -> Result<Response<RefreshTokenResponse>, Status> {
         let req = request.into_inner();
-        let (user_id, tenant_id) = self.db
+        let (user_id, tenant_id) = self
+            .db
             .consume_refresh_token(&req.refresh_token)
             .await
             .map_err(|e| Status::internal(e))?
             .ok_or_else(|| Status::unauthenticated("invalid or expired refresh token"))?;
 
-        let secret = self.db.get_jwt_secret().await.map_err(|e| Status::internal(e))?;
+        let secret = self
+            .db
+            .get_jwt_secret()
+            .await
+            .map_err(|e| Status::internal(e))?;
         let access_token = issue_jwt(&user_id, &tenant_id, &secret)?;
-        let new_refresh_token = self.db
+        let new_refresh_token = self
+            .db
             .create_refresh_token(&user_id, &tenant_id)
             .await
             .map_err(|e| Status::internal(e))?;
@@ -617,24 +769,41 @@ impl ArxService for ArxServiceImpl {
     }
 
     // ── Logout ───────────────────────────────────────────────────────────────
-    async fn logout(&self, request: Request<LogoutRequest>) -> Result<Response<LogoutResponse>, Status> {
+    async fn logout(
+        &self,
+        request: Request<LogoutRequest>,
+    ) -> Result<Response<LogoutResponse>, Status> {
         let req = request.into_inner();
         self.db
             .revoke_refresh_token(&req.refresh_token)
             .await
             .map_err(|e| Status::internal(e))?;
-        Ok(Response::new(LogoutResponse { ok: true, error: String::new() }))
+        Ok(Response::new(LogoutResponse {
+            ok: true,
+            error: String::new(),
+        }))
     }
 
     // ── Whoami ───────────────────────────────────────────────────────────────
-    async fn whoami(&self, request: Request<WhoamiRequest>) -> Result<Response<WhoamiResponse>, Status> {
-        let (tenant_id, user_id) = { let _t = extract_bearer(&request)?; extract_identity(&_t, &self.db).await? };
-        let (email, _) = self.db
+    async fn whoami(
+        &self,
+        request: Request<WhoamiRequest>,
+    ) -> Result<Response<WhoamiResponse>, Status> {
+        let (tenant_id, user_id) = {
+            let _t = extract_bearer(&request)?;
+            extract_identity(&_t, &self.db).await?
+        };
+        let (email, _) = self
+            .db
             .get_user_info(&user_id)
             .await
             .map_err(|e| Status::internal(e))?
             .ok_or_else(|| Status::not_found("user not found"))?;
-        Ok(Response::new(WhoamiResponse { user_id, email, tenant_id }))
+        Ok(Response::new(WhoamiResponse {
+            user_id,
+            email,
+            tenant_id,
+        }))
     }
 
     // ── CreateTenant (admin) ──────────────────────────────────────────────────
@@ -645,8 +814,14 @@ impl ArxService for ArxServiceImpl {
         check_admin(&request, &self.admin_key)?;
         let name = request.into_inner().name;
         match self.db.create_tenant(&name).await {
-            Ok(id) => Ok(Response::new(CreateTenantResponse { tenant_id: id, error: String::new() })),
-            Err(e) => Ok(Response::new(CreateTenantResponse { tenant_id: String::new(), error: e })),
+            Ok(id) => Ok(Response::new(CreateTenantResponse {
+                tenant_id: id,
+                error: String::new(),
+            })),
+            Err(e) => Ok(Response::new(CreateTenantResponse {
+                tenant_id: String::new(),
+                error: e,
+            })),
         }
     }
 
@@ -657,9 +832,19 @@ impl ArxService for ArxServiceImpl {
     ) -> Result<Response<CreateUserResponse>, Status> {
         check_admin(&request, &self.admin_key)?;
         let req = request.into_inner();
-        match self.db.create_user(&req.tenant_id, &req.email, &req.password).await {
-            Ok(id) => Ok(Response::new(CreateUserResponse { user_id: id, error: String::new() })),
-            Err(e) => Ok(Response::new(CreateUserResponse { user_id: String::new(), error: e })),
+        match self
+            .db
+            .create_user(&req.tenant_id, &req.email, &req.password)
+            .await
+        {
+            Ok(id) => Ok(Response::new(CreateUserResponse {
+                user_id: id,
+                error: String::new(),
+            })),
+            Err(e) => Ok(Response::new(CreateUserResponse {
+                user_id: String::new(),
+                error: e,
+            })),
         }
     }
 
@@ -671,7 +856,8 @@ impl ArxService for ArxServiceImpl {
         check_admin(&request, &self.admin_key)?;
         let req = request.into_inner();
         // Resolve user's tenant_id from the DB
-        let (_, tenant_id) = self.db
+        let (_, tenant_id) = self
+            .db
             .get_user_info(&req.user_id)
             .await
             .map_err(|e| Status::internal(e))?
@@ -687,9 +873,19 @@ impl ArxService for ArxServiceImpl {
                     + req.expires_in_secs as i64,
             )
         };
-        match self.db.create_api_key(&req.user_id, &tenant_id, &req.name, expires_at).await {
-            Ok(key) => Ok(Response::new(CreateApiKeyResponse { api_key: key, error: String::new() })),
-            Err(e) => Ok(Response::new(CreateApiKeyResponse { api_key: String::new(), error: e })),
+        match self
+            .db
+            .create_api_key(&req.user_id, &tenant_id, &req.name, expires_at)
+            .await
+        {
+            Ok(key) => Ok(Response::new(CreateApiKeyResponse {
+                api_key: key,
+                error: String::new(),
+            })),
+            Err(e) => Ok(Response::new(CreateApiKeyResponse {
+                api_key: String::new(),
+                error: e,
+            })),
         }
     }
 
@@ -701,8 +897,14 @@ impl ArxService for ArxServiceImpl {
         check_admin(&request, &self.admin_key)?;
         let key_hash = request.into_inner().key_hash;
         match self.db.revoke_api_key(&key_hash).await {
-            Ok(()) => Ok(Response::new(RevokeApiKeyResponse { ok: true, error: String::new() })),
-            Err(e) => Ok(Response::new(RevokeApiKeyResponse { ok: false, error: e })),
+            Ok(()) => Ok(Response::new(RevokeApiKeyResponse {
+                ok: true,
+                error: String::new(),
+            })),
+            Err(e) => Ok(Response::new(RevokeApiKeyResponse {
+                ok: false,
+                error: e,
+            })),
         }
     }
 
@@ -712,9 +914,17 @@ impl ArxService for ArxServiceImpl {
         request: Request<ListTenantsRequest>,
     ) -> Result<Response<ListTenantsResponse>, Status> {
         check_admin(&request, &self.admin_key)?;
-        let tenants = self.db.list_tenants().await.map_err(|e| Status::internal(e))?
+        let tenants = self
+            .db
+            .list_tenants()
+            .await
+            .map_err(|e| Status::internal(e))?
             .into_iter()
-            .map(|t| TenantInfoMsg { id: t.id, name: t.name, created_at: t.created_at })
+            .map(|t| TenantInfoMsg {
+                id: t.id,
+                name: t.name,
+                created_at: t.created_at,
+            })
             .collect();
         Ok(Response::new(ListTenantsResponse { tenants }))
     }
@@ -726,7 +936,11 @@ impl ArxService for ArxServiceImpl {
     ) -> Result<Response<ListUsersResponse>, Status> {
         check_admin(&request, &self.admin_key)?;
         let tenant_id = request.into_inner().tenant_id;
-        let users = self.db.list_users(&tenant_id).await.map_err(|e| Status::internal(e))?
+        let users = self
+            .db
+            .list_users(&tenant_id)
+            .await
+            .map_err(|e| Status::internal(e))?
             .into_iter()
             .map(|u| UserInfoMsg {
                 id: u.id,

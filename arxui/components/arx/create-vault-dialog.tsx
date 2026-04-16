@@ -54,8 +54,8 @@ export function CreateVaultDialog({ open, onOpenChange, onCreated }: Props) {
         <DialogHeader>
           <DialogTitle>Create a new vault</DialogTitle>
           <DialogDescription>
-            A vault is an encrypted archive that stores your files. Files are
-            compressed and deduplicated automatically.
+            A vault is an encrypted archive that stores your files. Files are compressed
+            and deduplicated automatically.
           </DialogDescription>
         </DialogHeader>
 
@@ -87,14 +87,12 @@ export function CreateVaultDialog({ open, onOpenChange, onCreated }: Props) {
               disabled={loading}
             />
             <p className="text-xs text-muted-foreground">
-              If set, you&apos;ll need this password to access files. Cannot be
-              changed later.
+              If set, you&apos;ll need this password to access files. Cannot be changed
+              later.
             </p>
           </div>
 
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+          {error && <p className="text-sm text-destructive">{error}</p>}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button

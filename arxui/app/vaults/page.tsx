@@ -40,7 +40,8 @@ export default function VaultsPage() {
             My Vaults
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {vaults.length} vault{vaults.length !== 1 ? "s" : ""} · encrypted archive storage
+            {vaults.length} vault{vaults.length !== 1 ? "s" : ""} · encrypted archive
+            storage
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)} className="gap-2">

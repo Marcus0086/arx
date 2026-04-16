@@ -40,8 +40,7 @@ export default function ChatConversation({
       if (
         lastGroup &&
         lastGroup.isFromCurrentUser === message.isFromCurrentUser &&
-        messageTime - new Date(lastGroup.timestamp).getTime() <=
-          MESSAGE_GROUP_THRESHOLD
+        messageTime - new Date(lastGroup.timestamp).getTime() <= MESSAGE_GROUP_THRESHOLD
       ) {
         // Add to existing group
         lastGroup.messages.push(message);
@@ -73,10 +72,7 @@ export default function ChatConversation({
       <div className="flex-1 overflow-y-auto overflow-x-clip p-4 space-y-4">
         {/* Date header */}
         <div className="text-center">
-          <Badge
-            variant="secondary"
-            className="font-medium text-xs text-foreground/40"
-          >
+          <Badge variant="secondary" className="font-medium text-xs text-foreground/40">
             {formatDate(activeConversation.messages[0]?.timestamp || "")}
           </Badge>
         </div>
@@ -91,7 +87,7 @@ export default function ChatConversation({
               transition={{ duration: 0.3, ease: "easeOut" }}
               className={cn(
                 "flex flex-col gap-1",
-                group.isFromCurrentUser ? "items-end" : "items-start"
+                group.isFromCurrentUser ? "items-end" : "items-start",
               )}
             >
               {/* Timestamp for the group */}
@@ -131,16 +127,15 @@ export default function ChatConversation({
                     messageIndex === 0 && group.isFromCurrentUser
                       ? "rounded-br-sm"
                       : messageIndex === 0 && !group.isFromCurrentUser
-                      ? "rounded-bl-sm"
-                      : "",
+                        ? "rounded-bl-sm"
+                        : "",
                     // Last message in group gets more rounded corners on the outer side
-                    messageIndex === group.messages.length - 1 &&
-                      group.isFromCurrentUser
+                    messageIndex === group.messages.length - 1 && group.isFromCurrentUser
                       ? "rounded-tr-sm"
                       : messageIndex === group.messages.length - 1 &&
-                        !group.isFromCurrentUser
-                      ? "rounded-tl-sm"
-                      : ""
+                          !group.isFromCurrentUser
+                        ? "rounded-tl-sm"
+                        : "",
                   )}
                   layout
                 >
@@ -159,7 +154,7 @@ export default function ChatConversation({
           onChange={(e) => setNewMessage(e.target.value)}
           placeholder={`Message ${
             activeConversation.participants.find(
-              (p) => p.id !== "joyboy" // Using current user ID
+              (p) => p.id !== "joyboy", // Using current user ID
             )?.name
           }`}
           className="flex-1 rounded-none border-none text-foreground placeholder-foreground/40 text-sm"

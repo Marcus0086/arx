@@ -81,7 +81,7 @@ export default function NotificationItem({
         !notification.read && "cursor-pointer",
         notification.read
           ? "bg-background/50 border-border/30"
-          : "bg-background border-border shadow-sm"
+          : "bg-background border-border shadow-sm",
       )}
       onClick={handleNotificationClick}
     >
@@ -89,7 +89,7 @@ export default function NotificationItem({
         <div
           className={cn(
             "w-2 h-2 rounded-full mt-2 flex-shrink-0",
-            getTypeColor(notification.type)
+            getTypeColor(notification.type),
           )}
         />
 
@@ -101,7 +101,7 @@ export default function NotificationItem({
                   <h4
                     className={cn(
                       "text-sm font-medium truncate",
-                      !notification.read && "font-semibold"
+                      !notification.read && "font-semibold",
                     )}
                   >
                     {notification.title}

@@ -8,13 +8,7 @@ import { FileGrid } from "@/components/arx/file-grid";
 import { UploadZone } from "@/components/arx/upload-zone";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  ArrowLeft,
-  RefreshCw,
-  GitCompare,
-  Upload,
-  Loader2,
-} from "lucide-react";
+import { ArrowLeft, RefreshCw, GitCompare, Upload, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { UploadFile } from "@/src/sdk";
 
@@ -30,7 +24,11 @@ export default function VaultDetailPage({ params }: Props) {
   const router = useRouter();
   const [uploading, setUploading] = useState(false);
 
-  const { data: files = [], isLoading, refetch } = useQuery({
+  const {
+    data: files = [],
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["vault-files", vaultId],
     queryFn: () => sdk.files.list(vaultId),
   });
@@ -57,11 +55,14 @@ export default function VaultDetailPage({ params }: Props) {
   async function handleUpload(browserFiles: File[]) {
     setUploading(true);
     const items = addToQueue(browserFiles, vaultId);
-    const uploadFiles: UploadFile[] = browserFiles.map((f, i) => ({
-      name: f.name,
-      file: f,
-      _id: items[i].id,
-    } as UploadFile & { _id: string }));
+    const uploadFiles: UploadFile[] = browserFiles.map(
+      (f, i) =>
+        ({
+          name: f.name,
+          file: f,
+          _id: items[i].id,
+        }) as UploadFile & { _id: string },
+    );
 
     for (let i = 0; i < uploadFiles.length; i++) {
       const uf = uploadFiles[i];
@@ -69,8 +70,7 @@ export default function VaultDetailPage({ params }: Props) {
       updateItem(item.id, { status: "uploading" });
       try {
         await sdk.files.upload(vaultId, [uf], {
-          onProgress: ({ bytesUploaded }) =>
-            updateItem(item.id, { bytesUploaded }),
+          onProgress: ({ bytesUploaded }) => updateItem(item.id, { bytesUploaded }),
         });
         updateItem(item.id, { status: "done", bytesUploaded: item.fileSize });
       } catch (err) {
@@ -184,7 +184,10 @@ export default function VaultDetailPage({ params }: Props) {
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
             {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className="aspect-square rounded-lg bg-muted/40 animate-pulse" />
+              <div
+                key={i}
+                className="aspect-square rounded-lg bg-muted/40 animate-pulse"
+              />
             ))}
           </div>
         ) : (

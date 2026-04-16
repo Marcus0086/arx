@@ -21,8 +21,12 @@ export function isTokenExpired(token: string): boolean {
 /** In-memory store — access token lives here (intentionally lost on page refresh). */
 class MemoryStore {
   private accessToken: string | null = null;
-  getAccessToken() { return this.accessToken; }
-  setAccessToken(t: string) { this.accessToken = t; }
+  getAccessToken() {
+    return this.accessToken;
+  }
+  setAccessToken(t: string) {
+    this.accessToken = t;
+  }
 }
 
 const _mem = new MemoryStore();

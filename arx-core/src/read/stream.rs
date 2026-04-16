@@ -105,7 +105,10 @@ impl<'a> RangeReader<'a> {
             std::io::copy(&mut (&mut fr).take(offset_in_chunk), &mut std::io::sink())?;
         }
 
-        Ok(Self { inner: fr, remain: len })
+        Ok(Self {
+            inner: fr,
+            remain: len,
+        })
     }
 }
 

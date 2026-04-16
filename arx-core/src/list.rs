@@ -201,7 +201,11 @@ pub fn list(archive: &Path, opts: Option<&ListOptions>) -> Result<()> {
         tbytes
     };
 
-    let per_entry = if sb.version >= 4 { ENTRY_SIZE } else { ENTRY_SIZE_V3 };
+    let per_entry = if sb.version >= 4 {
+        ENTRY_SIZE
+    } else {
+        ENTRY_SIZE_V3
+    };
     let expected_pt_len = sb.chunk_count as usize * per_entry;
     if raw_table.len() != expected_pt_len {
         return Err(std::io::Error::new(

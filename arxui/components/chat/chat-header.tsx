@@ -28,23 +28,16 @@ export function ChatHeader({
   variant = "desktop",
   className,
 }: ChatHeaderProps) {
-  const {
-    chatState,
-    totalUnreadCount,
-    activeConversation,
-    goBack,
-    toggleExpanded,
-  } = useChatState();
+  const { chatState, totalUnreadCount, activeConversation, goBack, toggleExpanded } =
+    useChatState();
 
   const isV0 = useIsV0();
 
   const hasNewMessages = totalUnreadCount > 0;
   const shouldHighlightUnreadMessages =
-    variant === "mobile"
-      ? false
-      : chatState.state === "collapsed" && hasNewMessages;
+    variant === "mobile" ? false : chatState.state === "collapsed" && hasNewMessages;
   const otherUser = activeConversation?.participants.find(
-    (p) => p.id !== mockChatData.currentUser.id
+    (p) => p.id !== mockChatData.currentUser.id,
   );
 
   const handleClick = () => {
@@ -72,7 +65,7 @@ export function ChatHeader({
         shouldHighlightUnreadMessages
           ? "w-full h-14 bg-primary text-primary-foreground rounded-t-lg px-4 py-3"
           : "w-full h-14 bg-background text-foreground rounded-t-lg px-4 py-3",
-        className
+        className,
       )}
       onClick={handleClick}
     >
@@ -127,9 +120,7 @@ export function ChatHeader({
             // Desktop variant
             if (chatState.state === "collapsed") {
               return shouldHighlightUnreadMessages
-                ? `${totalUnreadCount} New Message${
-                    totalUnreadCount > 1 ? "s" : ""
-                  }`
+                ? `${totalUnreadCount} New Message${totalUnreadCount > 1 ? "s" : ""}`
                 : "Chat";
             }
 

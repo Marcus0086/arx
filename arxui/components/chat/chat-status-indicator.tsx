@@ -21,9 +21,9 @@ export function ChatStatusIndicator({
         hasUnreadMessages
           ? "bg-primary-foreground text-primary text-center font-bold text-xs flex items-center justify-center"
           : isExpanded
-          ? "bg-success"
-          : "bg-primary",
-        hasUnreadMessages ? "size-6" : "size-3"
+            ? "bg-success"
+            : "bg-primary",
+        hasUnreadMessages ? "size-6" : "size-3",
       )}
     >
       <AnimatePresence initial={false}>

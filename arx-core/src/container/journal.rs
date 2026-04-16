@@ -115,7 +115,10 @@ fn read_next_record(f: &mut File, enc: EncMode, salt: [u8; 32]) -> Result<Option
             cipher
                 .decrypt(&XNonce::from(nonce), buf.as_ref())
                 .map_err(|_| {
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, "journal aead decrypt failed")
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "journal aead decrypt failed",
+                    )
                 })?
         }
     };
@@ -207,8 +210,7 @@ impl Journal {
         match self.enc {
             EncMode::Plain => {
                 let mut lenv = Vec::with_capacity(10);
-                write_uvarint(&mut lenv, plain.len() as u64)
-                    .expect("write to Vec never fails");
+                write_uvarint(&mut lenv, plain.len() as u64).expect("write to Vec never fails");
                 self.f.write_all(&lenv)?;
                 self.f.write_all(&plain)?;
                 self.f.flush()?;
@@ -232,11 +234,12 @@ impl Journal {
                 let cipher = XChaCha20Poly1305::new((&key).into());
                 let ct = cipher
                     .encrypt(&XNonce::from(nonce), plain.as_ref())
-                    .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "journal aead encrypt"))?;
+                    .map_err(|_| {
+                        std::io::Error::new(std::io::ErrorKind::Other, "journal aead encrypt")
+                    })?;
 
                 let mut lenv = Vec::with_capacity(10);
-                write_uvarint(&mut lenv, ct.len() as u64)
-                    .expect("write to Vec never fails");
+                write_uvarint(&mut lenv, ct.len() as u64).expect("write to Vec never fails");
                 self.f.write_all(&lenv)?;
                 self.f.write_all(&ct)?;
                 self.f.flush()?;

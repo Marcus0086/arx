@@ -48,7 +48,11 @@ pub struct Superblock {
 impl Superblock {
     /// The actual header length based on this archive's version.
     pub fn header_len(&self) -> u64 {
-        if self.version >= 4 { HEADER_LEN } else { HEADER_LEN_V3 }
+        if self.version >= 4 {
+            HEADER_LEN
+        } else {
+            HEADER_LEN_V3
+        }
     }
 
     pub fn write_to(&self, mut w: impl Write) -> std::io::Result<()> {
@@ -106,7 +110,15 @@ impl Superblock {
             [0u8; 32]
         };
 
-        Ok(Self { version, manifest_len, chunk_table_off, chunk_count, data_off, flags, kdf_salt })
+        Ok(Self {
+            version,
+            manifest_len,
+            chunk_table_off,
+            chunk_count,
+            data_off,
+            flags,
+            kdf_salt,
+        })
     }
 }
 
@@ -149,12 +161,12 @@ mod tests {
         // Craft a hand-built v3 header (48 bytes)
         let mut buf = Vec::new();
         buf.extend_from_slice(MAGIC);
-        buf.extend_from_slice(&3u16.to_le_bytes());   // version 3
+        buf.extend_from_slice(&3u16.to_le_bytes()); // version 3
         buf.extend_from_slice(&100u64.to_le_bytes()); // manifest_len
         buf.extend_from_slice(&200u64.to_le_bytes()); // chunk_table_off
-        buf.extend_from_slice(&2u64.to_le_bytes());   // chunk_count
+        buf.extend_from_slice(&2u64.to_le_bytes()); // chunk_count
         buf.extend_from_slice(&264u64.to_le_bytes()); // data_off
-        buf.extend_from_slice(&0u64.to_le_bytes());   // flags
+        buf.extend_from_slice(&0u64.to_le_bytes()); // flags
         assert_eq!(buf.len(), HEADER_LEN_V3 as usize);
 
         let sb = Superblock::read_from(Cursor::new(&buf)).unwrap();

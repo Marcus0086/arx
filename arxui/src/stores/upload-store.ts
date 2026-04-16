@@ -39,6 +39,5 @@ export const useUploadStore = create<UploadState>((set, get) => ({
       items: s.items.map((it) => (it.id === id ? { ...it, ...patch } : it)),
     })),
   remove: (id) => set((s) => ({ items: s.items.filter((it) => it.id !== id) })),
-  clearDone: () =>
-    set((s) => ({ items: s.items.filter((it) => it.status !== "done") })),
+  clearDone: () => set((s) => ({ items: s.items.filter((it) => it.status !== "done") })),
 }));

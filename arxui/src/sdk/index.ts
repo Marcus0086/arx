@@ -31,9 +31,11 @@ export class ArxClient {
 
   static create(opts: ArxClientOpts): ArxClient {
     const store = opts.tokenStore ?? defaultTokenStore;
-    const onExpired = opts.onAuthExpired ?? (() => {
-      if (typeof window !== "undefined") window.location.href = "/login";
-    });
+    const onExpired =
+      opts.onAuthExpired ??
+      (() => {
+        if (typeof window !== "undefined") window.location.href = "/login";
+      });
 
     const transport = buildTransport(opts.baseUrl, store, onExpired);
 

@@ -26,9 +26,9 @@ export function buildTransport(
       if (!token || isTokenExpired(token)) {
         // Coalesce concurrent refreshes into a single request
         if (!_refreshPromise) {
-          _refreshPromise = doRefresh(baseUrl, store, onRefreshFailed).finally(
-            () => { _refreshPromise = null; },
-          );
+          _refreshPromise = doRefresh(baseUrl, store, onRefreshFailed).finally(() => {
+            _refreshPromise = null;
+          });
         }
         token = await _refreshPromise;
       }

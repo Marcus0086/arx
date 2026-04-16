@@ -23,8 +23,8 @@ export interface DiffEntry {
 }
 
 export interface UploadFile {
-  name: string;    // path in archive
-  file: File;      // browser File object
+  name: string; // path in archive
+  file: File; // browser File object
 }
 
 const CHUNK_SIZE = 512 * 1024; // 512 KB — matches server frame limit
@@ -74,7 +74,7 @@ export class FileService {
     uf: UploadFile,
     onProgress?: (item: ProgressItem) => void,
   ): Promise<void> {
-const buffer = await uf.file.arrayBuffer();
+    const buffer = await uf.file.arrayBuffer();
     const bytes = new Uint8Array(buffer);
 
     const self = this;
