@@ -13,3 +13,7 @@ dataset
 *.arx
 *.delta
 *.log
+
+# Docker — real tenant keys (example file is tracked, populated config is not)
+config/tenants.json
+.env

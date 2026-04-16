@@ -1,0 +1,27 @@
+# docker-compose.dev.yml — local development overrides
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Changes from production compose:
+#   - restart: "no"  (don't auto-restart on crash — see errors immediately)
+#   - Uses the bundled example tenants.json (dummy keys, safe for local use)
+#   - Separate named volume so dev data doesn't pollute production data
+#   - RUST_LOG=debug forwarded if set in the host environment
+
+services:
+  arx-grpc:
+    restart: "no"
+    environment:
+      ROOT_DIR: /data
+      PORT: "${PORT:-50051}"
+      TENANTS_JSON: /etc/arx/tenants.json
+    volumes:
+      # Isolated dev data volume
+      - arx-data-dev:/data
+      # Use the bundled example config — no setup needed
+      - ./arx-grpc/tenants.json.example:/etc/arx/tenants.json:ro
+
+volumes:
+  arx-data-dev:
+    driver: local

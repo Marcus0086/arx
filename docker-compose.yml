@@ -1,0 +1,44 @@
+# docker-compose.yml — ARX gRPC server
+#
+# Quick start (local dev):
+#   docker compose up -d
+#
+# The server reads tenants from TENANTS_JSON (default: ./config/tenants.json).
+# If that file is absent it starts but rejects every request — copy the example
+# to get going:
+#   mkdir -p config
+#   cp arx-grpc/tenants.json.example config/tenants.json
+#   # edit config/tenants.json — replace dummy keys with real ones
+#   docker compose up -d
+#
+# Production: set ROOT_DIR and TENANTS_JSON_PATH as env vars or in a .env file.
+
+services:
+  arx-grpc:
+    build:
+      context: .
+      target: server
+    image: arx-grpc:latest
+    container_name: arx-grpc
+    restart: unless-stopped
+    ports:
+      - "${PORT:-50051}:${PORT:-50051}"
+    environment:
+      ROOT_DIR: /data
+      PORT: "${PORT:-50051}"
+      TENANTS_JSON: /etc/arx/tenants.json
+    volumes:
+      # Persistent archive storage
+      - arx-data:/data
+      # Tenant config directory — mount your own tenants.json here
+      - "${CONFIG_DIR:-./config}:/etc/arx"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "${PORT:-50051}"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  arx-data:
+    driver: local

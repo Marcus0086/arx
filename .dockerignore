@@ -1,0 +1,30 @@
+# Build artifacts — large, must exclude
+/target
+.cache
+.cargo-home
+
+# Nix artifacts
+result
+.direnv
+
+# VCS
+.git
+
+# macOS metadata
+.DS_Store
+
+# Test artifacts and large data files
+test_*
+dataset
+*.bin
+*.arx
+*.delta
+*.log
+
+# Secrets — never bake into the image
+.env
+config/tenants.json
+
+# Editor noise
+*.swp
+*.swo
