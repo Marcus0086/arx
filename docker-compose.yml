@@ -1,0 +1,39 @@
+# docker-compose.yml — ARX gRPC server
+#
+# Quick start:
+#   ARX_ADMIN_KEY=changeme docker compose up -d
+#
+# Then bootstrap your first tenant + user:
+#   grpcurl -plaintext -H "authorization: Bearer changeme" \
+#     -d '{"name":"acme"}' localhost:50051 arx.ArxService/CreateTenant
+#
+# Auth DB is stored automatically at ROOT_DIR/arx.db — no config file needed.
+# Production: set ARX_ADMIN_KEY via a secret manager or .env file.
+
+services:
+  arx-grpc:
+    build:
+      context: .
+      target: server
+    image: arx-grpc:latest
+    container_name: arx-grpc
+    restart: unless-stopped
+    ports:
+      - "${PORT:-50051}:${PORT:-50051}"
+    environment:
+      ROOT_DIR: /data
+      PORT: "${PORT:-50051}"
+      ARX_ADMIN_KEY: "${ARX_ADMIN_KEY:-}"
+    volumes:
+      # Persistent archive + auth DB storage
+      - arx-data:/data
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "${PORT:-50051}"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  arx-data:
+    driver: local

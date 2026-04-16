@@ -15,12 +15,14 @@ use arx_core::{ListOptions, PackOptions, pack};
 
 use crate::arx::arx_service_server::ArxService;
 use crate::arx::*;
-use crate::auth::{TenantStore, extract_tenant};
+use crate::auth::{check_admin, extract_bearer, extract_identity, extract_tenant, issue_jwt};
+use crate::db::AuthDb;
 use crate::store::ArchiveStore;
 
 pub struct ArxServiceImpl {
     pub store: Arc<ArchiveStore>,
-    pub tenants: Arc<TenantStore>,
+    pub db: Arc<AuthDb>,
+    pub admin_key: Arc<String>,
 }
 
 /// Map ArxError to tonic Status.
@@ -92,7 +94,7 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<Streaming<UploadFrame>>,
     ) -> Result<Response<PackResponse>, Status> {
-        let tenant_id = extract_tenant(&request, &self.tenants)?;
+        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
         let mut stream = request.into_inner();
 
         // First frame must be PackHeader
@@ -180,7 +182,7 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<ListRequest>,
     ) -> Result<Response<ListResponse>, Status> {
-        let tenant_id = extract_tenant(&request, &self.tenants)?;
+        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
@@ -211,7 +213,7 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<ExtractRequest>,
     ) -> Result<Response<Self::ExtractStreamStream>, Status> {
-        let tenant_id = extract_tenant(&request, &self.tenants)?;
+        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
@@ -279,7 +281,7 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<VerifyRequest>,
     ) -> Result<Response<VerifyResponse>, Status> {
-        let tenant_id = extract_tenant(&request, &self.tenants)?;
+        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
@@ -299,7 +301,7 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<IssueRequest>,
     ) -> Result<Response<IssueResponse>, Status> {
-        let tenant_id = extract_tenant(&request, &self.tenants)?;
+        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
         let req = request.into_inner();
         let aead_key = resolve_key_no_archive(req.key.as_ref())?;
 
@@ -330,7 +332,7 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<Streaming<UploadFrame>>,
     ) -> Result<Response<CrudAddResponse>, Status> {
-        let tenant_id = extract_tenant(&request, &self.tenants)?;
+        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
         let mut stream = request.into_inner();
 
         let first = stream.message().await?
@@ -399,7 +401,7 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<CrudRmRequest>,
     ) -> Result<Response<CrudRmResponse>, Status> {
-        let tenant_id = extract_tenant(&request, &self.tenants)?;
+        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
@@ -423,7 +425,7 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<CrudMvRequest>,
     ) -> Result<Response<CrudMvResponse>, Status> {
-        let tenant_id = extract_tenant(&request, &self.tenants)?;
+        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
@@ -444,7 +446,7 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<CrudLsRequest>,
     ) -> Result<Response<CrudLsResponse>, Status> {
-        let tenant_id = extract_tenant(&request, &self.tenants)?;
+        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
@@ -469,7 +471,7 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<CrudSyncRequest>,
     ) -> Result<Response<CrudSyncResponse>, Status> {
-        let tenant_id = extract_tenant(&request, &self.tenants)?;
+        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
@@ -503,7 +505,7 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<CrudDiffRequest>,
     ) -> Result<Response<CrudDiffResponse>, Status> {
-        let tenant_id = extract_tenant(&request, &self.tenants)?;
+        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
@@ -524,7 +526,7 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<ChunkMapRequest>,
     ) -> Result<Response<ChunkMapResponse>, Status> {
-        let tenant_id = extract_tenant(&request, &self.tenants)?;
+        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
@@ -547,7 +549,7 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<ListArchivesReq>,
     ) -> Result<Response<ListArchivesResp>, Status> {
-        let tenant_id = extract_tenant(&request, &self.tenants)?;
+        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
         let archives = self.store.list_archives(&tenant_id);
         Ok(Response::new(ListArchivesResp { archives }))
     }
@@ -557,9 +559,183 @@ impl ArxService for ArxServiceImpl {
         &self,
         request: Request<DeleteArchiveReq>,
     ) -> Result<Response<DeleteArchiveResp>, Status> {
-        let tenant_id = extract_tenant(&request, &self.tenants)?;
+        let tenant_id = { let _t = extract_bearer(&request)?; extract_tenant(&_t, &self.db).await? };
         let req = request.into_inner();
         self.store.delete_archive(&tenant_id, &req.archive_id)?;
         Ok(Response::new(DeleteArchiveResp { ok: true, error: String::new() }))
+    }
+
+    // ── Login ────────────────────────────────────────────────────────────────
+    async fn login(&self, request: Request<LoginRequest>) -> Result<Response<LoginResponse>, Status> {
+        let req = request.into_inner();
+        let (user_id, tenant_id) = self.db
+            .verify_login(&req.email, &req.password)
+            .await
+            .map_err(|e| Status::internal(e))?
+            .ok_or_else(|| Status::unauthenticated("invalid email or password"))?;
+
+        let secret = self.db.get_jwt_secret().await.map_err(|e| Status::internal(e))?;
+        let access_token = issue_jwt(&user_id, &tenant_id, &secret)?;
+        let refresh_token = self.db
+            .create_refresh_token(&user_id, &tenant_id)
+            .await
+            .map_err(|e| Status::internal(e))?;
+
+        Ok(Response::new(LoginResponse {
+            access_token,
+            refresh_token,
+            expires_in: 900,
+            error: String::new(),
+        }))
+    }
+
+    // ── RefreshToken ─────────────────────────────────────────────────────────
+    async fn refresh_token(
+        &self,
+        request: Request<RefreshTokenRequest>,
+    ) -> Result<Response<RefreshTokenResponse>, Status> {
+        let req = request.into_inner();
+        let (user_id, tenant_id) = self.db
+            .consume_refresh_token(&req.refresh_token)
+            .await
+            .map_err(|e| Status::internal(e))?
+            .ok_or_else(|| Status::unauthenticated("invalid or expired refresh token"))?;
+
+        let secret = self.db.get_jwt_secret().await.map_err(|e| Status::internal(e))?;
+        let access_token = issue_jwt(&user_id, &tenant_id, &secret)?;
+        let new_refresh_token = self.db
+            .create_refresh_token(&user_id, &tenant_id)
+            .await
+            .map_err(|e| Status::internal(e))?;
+
+        Ok(Response::new(RefreshTokenResponse {
+            access_token,
+            new_refresh_token,
+            expires_in: 900,
+            error: String::new(),
+        }))
+    }
+
+    // ── Logout ───────────────────────────────────────────────────────────────
+    async fn logout(&self, request: Request<LogoutRequest>) -> Result<Response<LogoutResponse>, Status> {
+        let req = request.into_inner();
+        self.db
+            .revoke_refresh_token(&req.refresh_token)
+            .await
+            .map_err(|e| Status::internal(e))?;
+        Ok(Response::new(LogoutResponse { ok: true, error: String::new() }))
+    }
+
+    // ── Whoami ───────────────────────────────────────────────────────────────
+    async fn whoami(&self, request: Request<WhoamiRequest>) -> Result<Response<WhoamiResponse>, Status> {
+        let (tenant_id, user_id) = { let _t = extract_bearer(&request)?; extract_identity(&_t, &self.db).await? };
+        let (email, _) = self.db
+            .get_user_info(&user_id)
+            .await
+            .map_err(|e| Status::internal(e))?
+            .ok_or_else(|| Status::not_found("user not found"))?;
+        Ok(Response::new(WhoamiResponse { user_id, email, tenant_id }))
+    }
+
+    // ── CreateTenant (admin) ──────────────────────────────────────────────────
+    async fn create_tenant(
+        &self,
+        request: Request<CreateTenantRequest>,
+    ) -> Result<Response<CreateTenantResponse>, Status> {
+        check_admin(&request, &self.admin_key)?;
+        let name = request.into_inner().name;
+        match self.db.create_tenant(&name).await {
+            Ok(id) => Ok(Response::new(CreateTenantResponse { tenant_id: id, error: String::new() })),
+            Err(e) => Ok(Response::new(CreateTenantResponse { tenant_id: String::new(), error: e })),
+        }
+    }
+
+    // ── CreateUser (admin) ────────────────────────────────────────────────────
+    async fn create_user(
+        &self,
+        request: Request<CreateUserRequest>,
+    ) -> Result<Response<CreateUserResponse>, Status> {
+        check_admin(&request, &self.admin_key)?;
+        let req = request.into_inner();
+        match self.db.create_user(&req.tenant_id, &req.email, &req.password).await {
+            Ok(id) => Ok(Response::new(CreateUserResponse { user_id: id, error: String::new() })),
+            Err(e) => Ok(Response::new(CreateUserResponse { user_id: String::new(), error: e })),
+        }
+    }
+
+    // ── CreateApiKey (admin) ──────────────────────────────────────────────────
+    async fn create_api_key(
+        &self,
+        request: Request<CreateApiKeyRequest>,
+    ) -> Result<Response<CreateApiKeyResponse>, Status> {
+        check_admin(&request, &self.admin_key)?;
+        let req = request.into_inner();
+        // Resolve user's tenant_id from the DB
+        let (_, tenant_id) = self.db
+            .get_user_info(&req.user_id)
+            .await
+            .map_err(|e| Status::internal(e))?
+            .ok_or_else(|| Status::not_found("user not found"))?;
+        let expires_at = if req.expires_in_secs == 0 {
+            None
+        } else {
+            Some(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs() as i64
+                    + req.expires_in_secs as i64,
+            )
+        };
+        match self.db.create_api_key(&req.user_id, &tenant_id, &req.name, expires_at).await {
+            Ok(key) => Ok(Response::new(CreateApiKeyResponse { api_key: key, error: String::new() })),
+            Err(e) => Ok(Response::new(CreateApiKeyResponse { api_key: String::new(), error: e })),
+        }
+    }
+
+    // ── RevokeApiKey (admin) ──────────────────────────────────────────────────
+    async fn revoke_api_key(
+        &self,
+        request: Request<RevokeApiKeyRequest>,
+    ) -> Result<Response<RevokeApiKeyResponse>, Status> {
+        check_admin(&request, &self.admin_key)?;
+        let key_hash = request.into_inner().key_hash;
+        match self.db.revoke_api_key(&key_hash).await {
+            Ok(()) => Ok(Response::new(RevokeApiKeyResponse { ok: true, error: String::new() })),
+            Err(e) => Ok(Response::new(RevokeApiKeyResponse { ok: false, error: e })),
+        }
+    }
+
+    // ── ListTenants (admin) ───────────────────────────────────────────────────
+    async fn list_tenants(
+        &self,
+        request: Request<ListTenantsRequest>,
+    ) -> Result<Response<ListTenantsResponse>, Status> {
+        check_admin(&request, &self.admin_key)?;
+        let tenants = self.db.list_tenants().await.map_err(|e| Status::internal(e))?
+            .into_iter()
+            .map(|t| TenantInfoMsg { id: t.id, name: t.name, created_at: t.created_at })
+            .collect();
+        Ok(Response::new(ListTenantsResponse { tenants }))
+    }
+
+    // ── ListUsers (admin) ─────────────────────────────────────────────────────
+    async fn list_users(
+        &self,
+        request: Request<ListUsersRequest>,
+    ) -> Result<Response<ListUsersResponse>, Status> {
+        check_admin(&request, &self.admin_key)?;
+        let tenant_id = request.into_inner().tenant_id;
+        let users = self.db.list_users(&tenant_id).await.map_err(|e| Status::internal(e))?
+            .into_iter()
+            .map(|u| UserInfoMsg {
+                id: u.id,
+                email: u.email,
+                tenant_id: u.tenant_id,
+                active: u.active,
+                created_at: u.created_at,
+            })
+            .collect();
+        Ok(Response::new(ListUsersResponse { users }))
     }
 }

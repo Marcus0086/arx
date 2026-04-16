@@ -1,0 +1,23 @@
+# docker-compose.dev.yml — local development overrides
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Changes from production:
+#   - restart: "no"  — see crashes immediately
+#   - Hardcoded ARX_ADMIN_KEY=devadminkey — no setup required
+#   - Separate named volume so dev data stays isolated
+
+services:
+  arx-grpc:
+    restart: "no"
+    environment:
+      ROOT_DIR: /data
+      PORT: "${PORT:-50051}"
+      ARX_ADMIN_KEY: "devadminkey"
+    volumes:
+      - arx-data-dev:/data
+
+volumes:
+  arx-data-dev:
+    driver: local
