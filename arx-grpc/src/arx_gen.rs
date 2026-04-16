@@ -166,6 +166,64 @@ pub struct DeleteArchiveReq  { #[prost(string, tag="1")] pub archive_id: String 
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DeleteArchiveResp { #[prost(bool, tag="1")] pub ok: bool, #[prost(string, tag="2")] pub error: String }
 
+// ── Auth messages ─────────────────────────────────────────────────────────────
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct LoginRequest { #[prost(string, tag="1")] pub email: String, #[prost(string, tag="2")] pub password: String }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct LoginResponse { #[prost(string, tag="1")] pub access_token: String, #[prost(string, tag="2")] pub refresh_token: String, #[prost(uint32, tag="3")] pub expires_in: u32, #[prost(string, tag="4")] pub error: String }
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RefreshTokenRequest { #[prost(string, tag="1")] pub refresh_token: String }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RefreshTokenResponse { #[prost(string, tag="1")] pub access_token: String, #[prost(string, tag="2")] pub new_refresh_token: String, #[prost(uint32, tag="3")] pub expires_in: u32, #[prost(string, tag="4")] pub error: String }
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct LogoutRequest { #[prost(string, tag="1")] pub refresh_token: String }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct LogoutResponse { #[prost(bool, tag="1")] pub ok: bool, #[prost(string, tag="2")] pub error: String }
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct WhoamiRequest {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct WhoamiResponse { #[prost(string, tag="1")] pub user_id: String, #[prost(string, tag="2")] pub email: String, #[prost(string, tag="3")] pub tenant_id: String }
+
+// ── Admin messages ────────────────────────────────────────────────────────────
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CreateTenantRequest { #[prost(string, tag="1")] pub name: String }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CreateTenantResponse { #[prost(string, tag="1")] pub tenant_id: String, #[prost(string, tag="2")] pub error: String }
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CreateUserRequest { #[prost(string, tag="1")] pub tenant_id: String, #[prost(string, tag="2")] pub email: String, #[prost(string, tag="3")] pub password: String }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CreateUserResponse { #[prost(string, tag="1")] pub user_id: String, #[prost(string, tag="2")] pub error: String }
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CreateApiKeyRequest { #[prost(string, tag="1")] pub user_id: String, #[prost(string, tag="2")] pub name: String, #[prost(uint64, tag="3")] pub expires_in_secs: u64 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CreateApiKeyResponse { #[prost(string, tag="1")] pub api_key: String, #[prost(string, tag="2")] pub error: String }
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RevokeApiKeyRequest { #[prost(string, tag="1")] pub key_hash: String }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RevokeApiKeyResponse { #[prost(bool, tag="1")] pub ok: bool, #[prost(string, tag="2")] pub error: String }
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListTenantsRequest {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TenantInfoMsg { #[prost(string, tag="1")] pub id: String, #[prost(string, tag="2")] pub name: String, #[prost(int64, tag="3")] pub created_at: i64 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListTenantsResponse { #[prost(message, repeated, tag="1")] pub tenants: Vec<TenantInfoMsg> }
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListUsersRequest { #[prost(string, tag="1")] pub tenant_id: String }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UserInfoMsg { #[prost(string, tag="1")] pub id: String, #[prost(string, tag="2")] pub email: String, #[prost(string, tag="3")] pub tenant_id: String, #[prost(bool, tag="4")] pub active: bool, #[prost(int64, tag="5")] pub created_at: i64 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListUsersResponse { #[prost(message, repeated, tag="1")] pub users: Vec<UserInfoMsg> }
+
 // ── Service trait ─────────────────────────────────────────────────────────────
 
 #[tonic::async_trait]
@@ -228,6 +286,48 @@ pub trait ArxService: Send + Sync + 'static {
     async fn delete_archive(
         &self, request: tonic::Request<DeleteArchiveReq>,
     ) -> std::result::Result<tonic::Response<DeleteArchiveResp>, tonic::Status>;
+
+    // ── Auth RPCs ──────────────────────────────────────────────────────────────
+    async fn login(
+        &self, request: tonic::Request<LoginRequest>,
+    ) -> std::result::Result<tonic::Response<LoginResponse>, tonic::Status>;
+
+    async fn refresh_token(
+        &self, request: tonic::Request<RefreshTokenRequest>,
+    ) -> std::result::Result<tonic::Response<RefreshTokenResponse>, tonic::Status>;
+
+    async fn logout(
+        &self, request: tonic::Request<LogoutRequest>,
+    ) -> std::result::Result<tonic::Response<LogoutResponse>, tonic::Status>;
+
+    async fn whoami(
+        &self, request: tonic::Request<WhoamiRequest>,
+    ) -> std::result::Result<tonic::Response<WhoamiResponse>, tonic::Status>;
+
+    // ── Admin RPCs ─────────────────────────────────────────────────────────────
+    async fn create_tenant(
+        &self, request: tonic::Request<CreateTenantRequest>,
+    ) -> std::result::Result<tonic::Response<CreateTenantResponse>, tonic::Status>;
+
+    async fn create_user(
+        &self, request: tonic::Request<CreateUserRequest>,
+    ) -> std::result::Result<tonic::Response<CreateUserResponse>, tonic::Status>;
+
+    async fn create_api_key(
+        &self, request: tonic::Request<CreateApiKeyRequest>,
+    ) -> std::result::Result<tonic::Response<CreateApiKeyResponse>, tonic::Status>;
+
+    async fn revoke_api_key(
+        &self, request: tonic::Request<RevokeApiKeyRequest>,
+    ) -> std::result::Result<tonic::Response<RevokeApiKeyResponse>, tonic::Status>;
+
+    async fn list_tenants(
+        &self, request: tonic::Request<ListTenantsRequest>,
+    ) -> std::result::Result<tonic::Response<ListTenantsResponse>, tonic::Status>;
+
+    async fn list_users(
+        &self, request: tonic::Request<ListUsersRequest>,
+    ) -> std::result::Result<tonic::Response<ListUsersResponse>, tonic::Status>;
 }
 
 // ── Server wrapper ────────────────────────────────────────────────────────────
@@ -345,6 +445,16 @@ where
             "/arx.ArxService/ChunkMap"      => unary_handler!(ChunkMapRequest, ChunkMapResponse, chunk_map),
             "/arx.ArxService/ListArchives"  => unary_handler!(ListArchivesReq, ListArchivesResp, list_archives),
             "/arx.ArxService/DeleteArchive" => unary_handler!(DeleteArchiveReq, DeleteArchiveResp, delete_archive),
+            "/arx.ArxService/Login"         => unary_handler!(LoginRequest, LoginResponse, login),
+            "/arx.ArxService/RefreshToken"  => unary_handler!(RefreshTokenRequest, RefreshTokenResponse, refresh_token),
+            "/arx.ArxService/Logout"        => unary_handler!(LogoutRequest, LogoutResponse, logout),
+            "/arx.ArxService/Whoami"        => unary_handler!(WhoamiRequest, WhoamiResponse, whoami),
+            "/arx.ArxService/CreateTenant"  => unary_handler!(CreateTenantRequest, CreateTenantResponse, create_tenant),
+            "/arx.ArxService/CreateUser"    => unary_handler!(CreateUserRequest, CreateUserResponse, create_user),
+            "/arx.ArxService/CreateApiKey"  => unary_handler!(CreateApiKeyRequest, CreateApiKeyResponse, create_api_key),
+            "/arx.ArxService/RevokeApiKey"  => unary_handler!(RevokeApiKeyRequest, RevokeApiKeyResponse, revoke_api_key),
+            "/arx.ArxService/ListTenants"   => unary_handler!(ListTenantsRequest, ListTenantsResponse, list_tenants),
+            "/arx.ArxService/ListUsers"     => unary_handler!(ListUsersRequest, ListUsersResponse, list_users),
             "/arx.ArxService/ExtractStream" => {
                 #[allow(non_camel_case_types)]
                 struct Svc<T: ArxService>(std::sync::Arc<T>);

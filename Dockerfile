@@ -68,9 +68,9 @@ RUN mkdir -p /data /etc/arx && chown arx:arx /data
 USER arx
 
 # Runtime configuration — all overridable via environment or compose
+# ARX_ADMIN_KEY: set this to enable admin RPCs (CreateTenant, CreateUser, etc.)
 ENV ROOT_DIR=/data \
-    PORT=50051 \
-    TENANTS_JSON=/etc/arx/tenants.json
+    PORT=50051
 
 EXPOSE 50051
 

@@ -151,6 +151,32 @@ message ListArchivesResp  { repeated ArchiveInfo archives = 1; }
 message DeleteArchiveReq  { string archive_id = 1; }
 message DeleteArchiveResp { bool ok = 1; string error = 2; }
 
+// ── Auth messages ─────────────────────────────────────────────────────────────
+message LoginRequest       { string email = 1; string password = 2; }
+message LoginResponse      { string access_token = 1; string refresh_token = 2; uint32 expires_in = 3; string error = 4; }
+message RefreshTokenRequest  { string refresh_token = 1; }
+message RefreshTokenResponse { string access_token = 1; string new_refresh_token = 2; uint32 expires_in = 3; string error = 4; }
+message LogoutRequest      { string refresh_token = 1; }
+message LogoutResponse     { bool ok = 1; string error = 2; }
+message WhoamiRequest      {}
+message WhoamiResponse     { string user_id = 1; string email = 2; string tenant_id = 3; }
+
+// ── Admin messages ────────────────────────────────────────────────────────────
+message CreateTenantRequest  { string name = 1; }
+message CreateTenantResponse { string tenant_id = 1; string error = 2; }
+message CreateUserRequest    { string tenant_id = 1; string email = 2; string password = 3; }
+message CreateUserResponse   { string user_id = 1; string error = 2; }
+message CreateApiKeyRequest  { string user_id = 1; string name = 2; uint64 expires_in_secs = 3; }
+message CreateApiKeyResponse { string api_key = 1; string error = 2; }
+message RevokeApiKeyRequest  { string key_hash = 1; }
+message RevokeApiKeyResponse { bool ok = 1; string error = 2; }
+message ListTenantsRequest   {}
+message TenantInfoMsg        { string id = 1; string name = 2; int64 created_at = 3; }
+message ListTenantsResponse  { repeated TenantInfoMsg tenants = 1; }
+message ListUsersRequest     { string tenant_id = 1; }
+message UserInfoMsg          { string id = 1; string email = 2; string tenant_id = 3; bool active = 4; int64 created_at = 5; }
+message ListUsersResponse    { repeated UserInfoMsg users = 1; }
+
 // ── Service ───────────────────────────────────────────────────────────────────
 service ArxService {
   // Pack: client streams UploadFrame messages → server stores archive → returns ID
@@ -176,4 +202,18 @@ service ArxService {
   // Archive management
   rpc ListArchives(ListArchivesReq)     returns (ListArchivesResp);
   rpc DeleteArchive(DeleteArchiveReq)   returns (DeleteArchiveResp);
+
+  // Auth — no prior credentials required
+  rpc Login(LoginRequest)               returns (LoginResponse);
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+  rpc Logout(LogoutRequest)             returns (LogoutResponse);
+  rpc Whoami(WhoamiRequest)             returns (WhoamiResponse);
+
+  // Admin — requires ARX_ADMIN_KEY in Authorization header
+  rpc CreateTenant(CreateTenantRequest) returns (CreateTenantResponse);
+  rpc CreateUser(CreateUserRequest)     returns (CreateUserResponse);
+  rpc CreateApiKey(CreateApiKeyRequest) returns (CreateApiKeyResponse);
+  rpc RevokeApiKey(RevokeApiKeyRequest) returns (RevokeApiKeyResponse);
+  rpc ListTenants(ListTenantsRequest)   returns (ListTenantsResponse);
+  rpc ListUsers(ListUsersRequest)       returns (ListUsersResponse);
 }

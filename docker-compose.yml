@@ -1,17 +1,14 @@
 # docker-compose.yml — ARX gRPC server
 #
-# Quick start (local dev):
-#   docker compose up -d
+# Quick start:
+#   ARX_ADMIN_KEY=changeme docker compose up -d
 #
-# The server reads tenants from TENANTS_JSON (default: ./config/tenants.json).
-# If that file is absent it starts but rejects every request — copy the example
-# to get going:
-#   mkdir -p config
-#   cp arx-grpc/tenants.json.example config/tenants.json
-#   # edit config/tenants.json — replace dummy keys with real ones
-#   docker compose up -d
+# Then bootstrap your first tenant + user:
+#   grpcurl -plaintext -H "authorization: Bearer changeme" \
+#     -d '{"name":"acme"}' localhost:50051 arx.ArxService/CreateTenant
 #
-# Production: set ROOT_DIR and TENANTS_JSON_PATH as env vars or in a .env file.
+# Auth DB is stored automatically at ROOT_DIR/arx.db — no config file needed.
+# Production: set ARX_ADMIN_KEY via a secret manager or .env file.
 
 services:
   arx-grpc:
@@ -26,12 +23,10 @@ services:
     environment:
       ROOT_DIR: /data
       PORT: "${PORT:-50051}"
-      TENANTS_JSON: /etc/arx/tenants.json
+      ARX_ADMIN_KEY: "${ARX_ADMIN_KEY:-}"
     volumes:
-      # Persistent archive storage
+      # Persistent archive + auth DB storage
       - arx-data:/data
-      # Tenant config directory — mount your own tenants.json here
-      - "${CONFIG_DIR:-./config}:/etc/arx"
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "${PORT:-50051}"]
       interval: 30s

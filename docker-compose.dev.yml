@@ -3,11 +3,10 @@
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 #
-# Changes from production compose:
-#   - restart: "no"  (don't auto-restart on crash — see errors immediately)
-#   - Uses the bundled example tenants.json (dummy keys, safe for local use)
-#   - Separate named volume so dev data doesn't pollute production data
-#   - RUST_LOG=debug forwarded if set in the host environment
+# Changes from production:
+#   - restart: "no"  — see crashes immediately
+#   - Hardcoded ARX_ADMIN_KEY=devadminkey — no setup required
+#   - Separate named volume so dev data stays isolated
 
 services:
   arx-grpc:
@@ -15,12 +14,9 @@ services:
     environment:
       ROOT_DIR: /data
       PORT: "${PORT:-50051}"
-      TENANTS_JSON: /etc/arx/tenants.json
+      ARX_ADMIN_KEY: "devadminkey"
     volumes:
-      # Isolated dev data volume
       - arx-data-dev:/data
-      # Use the bundled example config — no setup needed
-      - ./arx-grpc/tenants.json.example:/etc/arx/tenants.json:ro
 
 volumes:
   arx-data-dev:
