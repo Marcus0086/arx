@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use tonic::transport::Server;
+use tonic_web::GrpcWebLayer;
 
 use arx::arx_service_server::ArxServiceServer;
 use db::AuthDb;
@@ -44,7 +45,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let admin_key = std::env::var("ARX_ADMIN_KEY").unwrap_or_default();
     if admin_key.is_empty() {
-        eprintln!("warn: ARX_ADMIN_KEY not set — admin RPCs (CreateTenant, CreateUser, etc.) are disabled");
+        eprintln!(
+            "warn: ARX_ADMIN_KEY not set — admin RPCs (CreateTenant, CreateUser, etc.) are disabled"
+        );
     }
 
     std::fs::create_dir_all(&root_dir).map_err(|e| {
@@ -75,7 +78,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         db,
         admin_key: Arc::new(admin_key),
     });
-    Server::builder().add_service(svc).serve(addr).await?;
+    Server::builder()
+        .accept_http1(true) // required for grpc-web over HTTP/1.1
+        .layer(GrpcWebLayer::new()) // enables grpc-web from browsers
+        .add_service(svc)
+        .serve(addr)
+        .await?;
 
     Ok(())
 }
