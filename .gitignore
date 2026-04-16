@@ -3,7 +3,10 @@
 .cargo-home
 .direnv
 result
-test*
+# Ignore test artifacts but NOT the tests/ source directories
+test_*
+!tests/
+!**/tests/
 *.bin
 dataset
 .DS_Store

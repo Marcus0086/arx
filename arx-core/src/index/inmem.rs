@@ -4,6 +4,7 @@ use crate::codec::CodecId;
 use crate::container::journal::{ChunkRef, Loc, LogRecord};
 use crate::error::Result;
 use crate::policy::Policy;
+use crate::read::opened::Opened;
 use crate::stats::Stats;
 
 #[derive(Clone, Debug)]
@@ -23,9 +24,52 @@ pub struct InMemIndex {
 }
 
 impl InMemIndex {
-    /// Build from base archive (manifest + chunk table). Placeholder for now; we’ll wire actual readers next.
-    pub fn from_base() -> Result<Self> {
-        Ok(Self::default())
+    /// Build an index from a base archive's manifest + chunk table.
+    /// Each file entry is recorded with `Loc::Base` chunks pointing at the data
+    /// region of the base `.arx` file.
+    pub fn from_base(opened: &Opened) -> Result<Self> {
+        let mut idx = InMemIndex::default();
+
+        for fe in &opened.manifest.files {
+            let chunks: Vec<ChunkRef> = fe
+                .chunk_refs
+                .iter()
+                .map(|cr| {
+                    let ce = &opened.table[cr.id as usize];
+                    let codec = match ce.codec {
+                        0 => CodecId::Store,
+                        _ => CodecId::Zstd,
+                    };
+                    ChunkRef {
+                        loc: Loc::Base,
+                        // For Base chunks, off stores the chunk TABLE index so we
+                        // can reconstruct the data_off and perform AEAD with the
+                        // right nonce (nonce is derived from chunk_id).
+                        off: cr.id,
+                        len: ce.c_size,
+                        codec,
+                        blake3: ce.blake3,
+                    }
+                })
+                .collect();
+
+            idx.by_path.insert(
+                fe.path.clone(),
+                Entry {
+                    mode: fe.mode,
+                    mtime: fe.mtime as u64,
+                    size: fe.u_size,
+                    chunks,
+                },
+            );
+        }
+
+        idx.stats.files = opened.manifest.files.len() as u64;
+        idx.stats.dirs = opened.manifest.dirs.len() as u64;
+        idx.stats.chunks = opened.table.len() as u64;
+        idx.stats.logical_bytes = opened.manifest.files.iter().map(|f| f.u_size).sum();
+
+        Ok(idx)
     }
 
     pub fn apply(&mut self, rec: &LogRecord) {
@@ -37,7 +81,6 @@ impl InMemIndex {
                 size,
                 chunks,
             } => {
-                // update by_path
                 let e = Entry {
                     mode: *mode,
                     mtime: *mtime,
@@ -45,16 +88,19 @@ impl InMemIndex {
                     chunks: chunks.clone(),
                 };
                 self.by_path.insert(path.clone(), e);
-                // update by_chunk
                 for c in chunks {
                     self.by_chunk
                         .insert(c.blake3, (c.loc, c.off, c.len, c.codec));
                 }
-                self.stats.files += 1; // simplistic; refine later
-                self.stats.logical_bytes += *size as u64;
+                self.stats.files = self.stats.files.saturating_add(1);
+                self.stats.logical_bytes = self.stats.logical_bytes.saturating_add(*size);
             }
             LogRecord::Delete { path } => {
-                self.by_path.remove(path);
+                if let Some(e) = self.by_path.remove(path) {
+                    self.stats.files = self.stats.files.saturating_sub(1);
+                    self.stats.logical_bytes =
+                        self.stats.logical_bytes.saturating_sub(e.size);
+                }
             }
             LogRecord::Rename { from, to } => {
                 if let Some(e) = self.by_path.remove(from) {

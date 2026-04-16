@@ -1,6 +1,6 @@
-use crate::container::chunktab::{ENTRY_SIZE, read_table_from_slice};
+use crate::container::chunktab::{ENTRY_SIZE, ENTRY_SIZE_V3, read_table_from_slice};
 use crate::container::manifest::Manifest;
-use crate::container::superblock::{FLAG_ENCRYPTED, HEADER_LEN, Superblock};
+use crate::container::superblock::{FLAG_ENCRYPTED, Superblock};
 use crate::container::tail::{TAIL_LEN, TAIL_MAGIC};
 use crate::crypto::aead::{AeadKey, Region, derive_nonce};
 use crate::error::Result;
@@ -22,16 +22,17 @@ pub fn list(archive: &Path, opts: Option<&ListOptions>) -> Result<()> {
     let dbg = env::var_os("ARX_DEBUG_LIST").is_some();
 
     let sb = Superblock::read_from(&mut f)?;
+    let header_len = sb.header_len();
     let enc_enabled = (sb.flags & FLAG_ENCRYPTED) != 0;
 
     if dbg {
         eprintln!(
-            "[DBG] SB: ver={} flags=0x{:x}\n      manifest_len={}  HEADER_LEN={}  manifest_end={}\n      chunk_table_off={}  data_off={}  chunk_count={}\n      file_len={}",
+            "[DBG] SB: ver={} flags=0x{:x}\n      manifest_len={}  header_len={}  manifest_end={}\n      chunk_table_off={}  data_off={}  chunk_count={}\n      file_len={}",
             sb.version,
             sb.flags,
             sb.manifest_len,
-            HEADER_LEN,
-            HEADER_LEN + sb.manifest_len,
+            header_len,
+            header_len + sb.manifest_len,
             sb.chunk_table_off,
             sb.data_off,
             sb.chunk_count,
@@ -56,7 +57,7 @@ pub fn list(archive: &Path, opts: Option<&ListOptions>) -> Result<()> {
         }
     }
 
-    let manifest_end = HEADER_LEN.checked_add(sb.manifest_len).ok_or_else(|| {
+    let manifest_end = header_len.checked_add(sb.manifest_len).ok_or_else(|| {
         std::io::Error::new(std::io::ErrorKind::InvalidData, "manifest_len overflow")
     })?;
     if manifest_end > file_end_for_data {
@@ -69,7 +70,7 @@ pub fn list(archive: &Path, opts: Option<&ListOptions>) -> Result<()> {
         )
         .into());
     }
-    if sb.chunk_table_off < HEADER_LEN || sb.chunk_table_off > file_end_for_data {
+    if sb.chunk_table_off < header_len || sb.chunk_table_off > file_end_for_data {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             format!(
@@ -116,7 +117,8 @@ pub fn list(archive: &Path, opts: Option<&ListOptions>) -> Result<()> {
                 &o.key_salt[..4]
             );
         }
-        Some((AeadKey(key), o.key_salt))
+        // Use the archive's stored kdf_salt for nonce derivation
+        Some((AeadKey(key), sb.kdf_salt))
     } else {
         if dbg {
             eprintln!("[DBG] AEAD: disabled");
@@ -124,11 +126,11 @@ pub fn list(archive: &Path, opts: Option<&ListOptions>) -> Result<()> {
         None
     };
 
-    f.seek(SeekFrom::Start(HEADER_LEN))?;
+    f.seek(SeekFrom::Start(header_len))?;
     if dbg {
         eprintln!(
             "[DBG] Reading manifest: off={} len={}",
-            HEADER_LEN, sb.manifest_len
+            header_len, sb.manifest_len
         );
     }
     let mut mbytes = vec![0u8; sb.manifest_len as usize];
@@ -139,7 +141,7 @@ pub fn list(archive: &Path, opts: Option<&ListOptions>) -> Result<()> {
 
     let manifest_bytes = if let Some((ref key, salt)) = enc {
         let nonce = derive_nonce(&salt, Region::Manifest, 0);
-        let pt = crate::crypto::aead::open_whole(key, &nonce, b"manifest", &mbytes);
+        let pt = crate::crypto::aead::open_whole(key, &nonce, b"manifest", &mbytes)?;
         if dbg {
             eprintln!("[DBG] Manifest decrypted: pt_len={}", pt.len());
         }
@@ -190,7 +192,7 @@ pub fn list(archive: &Path, opts: Option<&ListOptions>) -> Result<()> {
 
     let raw_table = if let Some((ref key, salt)) = enc {
         let nonce = derive_nonce(&salt, Region::ChunkTable, 0);
-        let pt = crate::crypto::aead::open_whole(key, &nonce, b"chunktab", &tbytes);
+        let pt = crate::crypto::aead::open_whole(key, &nonce, b"chunktab", &tbytes)?;
         if dbg {
             eprintln!("[DBG] Chunk table decrypted: pt_len={}", pt.len());
         }
@@ -199,7 +201,8 @@ pub fn list(archive: &Path, opts: Option<&ListOptions>) -> Result<()> {
         tbytes
     };
 
-    let expected_pt_len = sb.chunk_count as usize * ENTRY_SIZE;
+    let per_entry = if sb.version >= 4 { ENTRY_SIZE } else { ENTRY_SIZE_V3 };
+    let expected_pt_len = sb.chunk_count as usize * per_entry;
     if raw_table.len() != expected_pt_len {
         return Err(std::io::Error::new(
             std::io::ErrorKind::UnexpectedEof,

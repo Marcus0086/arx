@@ -1,0 +1,179 @@
+syntax = "proto3";
+package arx;
+
+// ── Key material ─────────────────────────────────────────────────────────────
+// Pass either a raw 32-byte key or a password (Argon2id derives the key using
+// the archive's stored kdf_salt). If both are set, raw_key takes precedence.
+message KeyMaterial {
+  oneof key_source {
+    bytes  raw_key  = 1;
+    string password = 2;
+  }
+}
+
+// ── Upload stream frames (client → server) ───────────────────────────────────
+// Used by PackStream and CrudAddStream.
+// Protocol:
+//   Frame 1:   PackHeader OR CrudHeader (first frame identifies the operation)
+//   Frame 2+:  FileInfo (signals start of a new file)
+//   Frame 2+:  data bytes (raw file content, up to 512 KB per frame)
+//   Last:      finalize = true
+message UploadFrame {
+  oneof payload {
+    PackHeader  pack_header  = 1;
+    CrudHeader  crud_header  = 2;
+    FileInfo    file_info    = 3;
+    bytes       data         = 4;
+    bool        finalize     = 5;
+  }
+}
+
+message PackHeader {
+  string      archive_name  = 1;
+  bool        deterministic = 2;
+  float       min_gain      = 3;
+  KeyMaterial key           = 4;
+  string      label         = 5;
+  string      owner         = 6;
+  string      notes         = 7;
+}
+
+message CrudHeader {
+  string      archive_id = 1;
+  KeyMaterial key        = 2;
+}
+
+message FileInfo {
+  string path  = 1;
+  uint32 mode  = 2;
+  int64  mtime = 3;
+  uint64 size  = 4;
+}
+
+// ── Download stream frames (server → client) ─────────────────────────────────
+// Used by ExtractStream.
+// Protocol:
+//   Frame 1+:  FileInfo (signals start of a new file's data)
+//   Frame 2+:  data bytes (raw decompressed content, up to 512 KB)
+//   On error:  error string (terminal)
+message DownloadFrame {
+  oneof payload {
+    FileInfo file  = 1;
+    bytes    data  = 2;
+    string   error = 3;
+  }
+}
+
+// ── Archive statistics ────────────────────────────────────────────────────────
+message ArchiveStats {
+  uint64 files         = 1;
+  uint64 dirs          = 2;
+  uint64 chunks        = 3;
+  uint64 logical_bytes = 4;
+  uint64 stored_bytes  = 5;
+}
+
+// ── Pack ──────────────────────────────────────────────────────────────────────
+message PackResponse {
+  string       archive_id = 1;
+  ArchiveStats stats      = 2;
+  string       error      = 3;
+}
+
+// ── List ──────────────────────────────────────────────────────────────────────
+message ListRequest {
+  string      archive_id = 1;
+  KeyMaterial key        = 2;
+}
+message ListEntry {
+  string path   = 1;
+  uint64 u_size = 2;
+  uint64 c_size = 3;
+  uint32 chunks = 4;
+}
+message ListResponse {
+  repeated ListEntry entries = 1;
+}
+
+// ── Extract ───────────────────────────────────────────────────────────────────
+message ExtractRequest {
+  string      archive_id = 1;
+  string      path       = 2;   // empty = all files
+  uint64      start      = 3;
+  uint64      len        = 4;   // 0 = to EOF
+  KeyMaterial key        = 5;
+}
+
+// ── Verify ────────────────────────────────────────────────────────────────────
+message VerifyRequest  { string archive_id = 1; KeyMaterial key = 2; }
+message VerifyResponse { bool ok = 1; string error = 2; }
+
+// ── Issue ─────────────────────────────────────────────────────────────────────
+message IssueRequest {
+  string      archive_name  = 1;
+  string      label         = 2;
+  string      owner         = 3;
+  string      notes         = 4;
+  bool        deterministic = 5;
+  KeyMaterial key           = 6;
+}
+message IssueResponse { string archive_id = 1; string error = 2; }
+
+// ── CRUD ──────────────────────────────────────────────────────────────────────
+message CrudAddResponse  { bool ok = 1; string error = 2; }
+
+message CrudRmRequest    { string archive_id = 1; string path = 2; bool recursive = 3; KeyMaterial key = 4; }
+message CrudRmResponse   { bool ok = 1; string error = 2; }
+
+message CrudMvRequest    { string archive_id = 1; string from = 2; string to = 3; KeyMaterial key = 4; }
+message CrudMvResponse   { bool ok = 1; string error = 2; }
+
+message CrudLsRequest    { string archive_id = 1; string prefix = 2; bool long_format = 3; KeyMaterial key = 4; }
+message CrudLsEntry      { string path = 1; uint64 size = 2; uint64 mtime = 3; }
+message CrudLsResponse   { repeated CrudLsEntry entries = 1; }
+
+message CrudSyncRequest  { string archive_id = 1; bool seal_base = 2; KeyMaterial key = 3; }
+message CrudSyncResponse { string new_archive_id = 1; string error = 2; }
+
+message CrudDiffEntry    { string kind = 1; string path = 2; }
+message CrudDiffRequest  { string archive_id = 1; KeyMaterial key = 2; }
+message CrudDiffResponse { repeated CrudDiffEntry entries = 1; }
+
+// ── Chunk inspection ──────────────────────────────────────────────────────────
+message ChunkMapRequest  { string archive_id = 1; string path = 2; KeyMaterial key = 3; }
+message ChunkMapEntry    { uint64 ordinal = 1; uint64 id = 2; uint32 codec = 3; uint64 u_len = 4; uint64 c_len = 5; uint64 data_off = 6; }
+message ChunkMapResponse { repeated ChunkMapEntry entries = 1; }
+
+// ── Archive management ────────────────────────────────────────────────────────
+message ArchiveInfo       { string id = 1; string name = 2; uint64 size_bytes = 3; string created_at = 4; bool encrypted = 5; }
+message ListArchivesReq   {}
+message ListArchivesResp  { repeated ArchiveInfo archives = 1; }
+message DeleteArchiveReq  { string archive_id = 1; }
+message DeleteArchiveResp { bool ok = 1; string error = 2; }
+
+// ── Service ───────────────────────────────────────────────────────────────────
+service ArxService {
+  // Pack: client streams UploadFrame messages → server stores archive → returns ID
+  rpc PackStream(stream UploadFrame)    returns (PackResponse);
+
+  // Read operations
+  rpc List(ListRequest)                 returns (ListResponse);
+  rpc ExtractStream(ExtractRequest)     returns (stream DownloadFrame);
+  rpc Verify(VerifyRequest)             returns (VerifyResponse);
+  rpc ChunkMap(ChunkMapRequest)         returns (ChunkMapResponse);
+
+  // Create an empty archive
+  rpc Issue(IssueRequest)               returns (IssueResponse);
+
+  // CRUD overlay
+  rpc CrudAddStream(stream UploadFrame) returns (CrudAddResponse);
+  rpc CrudRm(CrudRmRequest)             returns (CrudRmResponse);
+  rpc CrudMv(CrudMvRequest)             returns (CrudMvResponse);
+  rpc CrudLs(CrudLsRequest)             returns (CrudLsResponse);
+  rpc CrudSync(CrudSyncRequest)         returns (CrudSyncResponse);
+  rpc CrudDiff(CrudDiffRequest)         returns (CrudDiffResponse);
+
+  // Archive management
+  rpc ListArchives(ListArchivesReq)     returns (ListArchivesResp);
+  rpc DeleteArchive(DeleteArchiveReq)   returns (DeleteArchiveResp);
+}

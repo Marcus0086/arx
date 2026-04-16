@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use crate::codec::CodecId;
 use crate::error::Result;
 use crate::policy::Policy;
+use crate::util::varint::{read_uvarint, uvarint_len, write_uvarint};
 
 use chacha20poly1305::aead::{Aead, KeyInit};
 use chacha20poly1305::{XChaCha20Poly1305, XNonce};
@@ -84,10 +85,9 @@ impl<'a> Iterator for JournalIter<'a> {
 
 fn read_next_record(f: &mut File, enc: EncMode, salt: [u8; 32]) -> Result<Option<LogRecord>> {
     let start = f.stream_position()?;
-    let len = match get_uvarint(f) {
-        Ok(Some(n)) => n,
-        Ok(None) => return Ok(None),
-        Err(e) => return Err(e),
+    let len = match read_uvarint(f)? {
+        Some(n) => n,
+        None => return Ok(None),
     };
     let payload_off = start + uvarint_len(len) as u64;
 
@@ -106,7 +106,7 @@ fn read_next_record(f: &mut File, enc: EncMode, salt: [u8; 32]) -> Result<Option
             hasher.update(b"arxlog");
             hasher.update(&salt);
             hasher.update(&payload_off.to_le_bytes());
-            hasher.update(&len.to_le_bytes()); // ciphertext len
+            hasher.update(&len.to_le_bytes());
             let hb = hasher.finalize();
             let mut nonce = [0u8; 24];
             nonce.copy_from_slice(&hb.as_bytes()[..24]);
@@ -115,7 +115,7 @@ fn read_next_record(f: &mut File, enc: EncMode, salt: [u8; 32]) -> Result<Option
             cipher
                 .decrypt(&XNonce::from(nonce), buf.as_ref())
                 .map_err(|_| {
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, "aead decrypt failed")
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, "journal aead decrypt failed")
                 })?
         }
     };
@@ -123,45 +123,6 @@ fn read_next_record(f: &mut File, enc: EncMode, salt: [u8; 32]) -> Result<Option
     let rec: LogRecord = serde_cbor::from_slice(&plain)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
     Ok(Some(rec))
-}
-
-fn put_uvarint(out: &mut Vec<u8>, mut x: u64) {
-    while x >= 0x80 {
-        out.push((x as u8) | 0x80);
-        x >>= 7;
-    }
-    out.push(x as u8);
-}
-
-fn get_uvarint<R: Read>(r: &mut R) -> Result<Option<u64>> {
-    let mut x: u64 = 0;
-    let mut s: u32 = 0;
-    for _ in 0..10 {
-        let mut b = [0u8; 1];
-        match r.read(&mut b) {
-            Ok(0) => return Ok(None),
-            Ok(_) => {
-                let byte = b[0];
-                if byte < 0x80 {
-                    x |= ((byte as u64) << s) as u64;
-                    return Ok(Some(x));
-                }
-                x |= (((byte & 0x7f) as u64) << s) as u64;
-                s += 7;
-            }
-            Err(e) => return Err(e.into()),
-        }
-    }
-    Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "varint too long").into())
-}
-
-fn uvarint_len(mut x: u64) -> usize {
-    let mut n = 1;
-    while x >= 0x80 {
-        x >>= 7;
-        n += 1;
-    }
-    n
 }
 
 impl Journal {
@@ -173,7 +134,6 @@ impl Journal {
             .create(true)
             .open(path)?;
         let (flags, salt) = if !existed {
-            // Write header
             let (flags, salt) = match enc {
                 EncMode::Plain => (0u8, [0u8; 32]),
                 EncMode::Aead { salt, .. } => (FLAG_AEAD, salt),
@@ -185,11 +145,10 @@ impl Journal {
             f.flush()?;
             (flags, salt)
         } else {
-            // Validate header, read flags+salt (tolerate legacy header with no flags/salt)
             let mut magic = [0u8; 8];
             f.read_exact(&mut magic)?;
             if &magic != MAGIC {
-                // Re-init conservatively
+                // Re-init on magic mismatch
                 f.seek(SeekFrom::Start(0))?;
                 f.set_len(0)?;
                 let (flags, salt) = match enc {
@@ -205,8 +164,7 @@ impl Journal {
             } else {
                 let mut ver = [0u8; 1];
                 f.read_exact(&mut ver)?;
-                let _ = ver[0]; // reserved
-                // Try read flags+salt; if EOF (legacy), assume Plain
+                let _ = ver[0];
                 let mut flags = [0u8; 1];
                 let mut salt = [0u8; 32];
                 match f.read_exact(&mut flags) {
@@ -220,7 +178,6 @@ impl Journal {
             }
         };
 
-        // Sanity: if file says AEAD but caller passed Plain, refuse (avoid gibberish reads)
         if flags & FLAG_AEAD != 0 {
             if let EncMode::Plain = enc {
                 return Err(std::io::Error::new(
@@ -231,7 +188,6 @@ impl Journal {
             }
         }
 
-        // Seek to end for appends
         f.seek(SeekFrom::End(0))?;
         Ok(Self {
             f,
@@ -242,7 +198,7 @@ impl Journal {
         })
     }
 
-    /// Append a single record (length-delimited). Partial tails are ignored on read.
+    /// Append a single record (length-delimited, optionally AEAD-sealed).
     pub fn append(&mut self, rec: &LogRecord) -> Result<()> {
         let mut plain = Vec::with_capacity(256);
         serde_cbor::to_writer(&mut plain, rec)
@@ -251,20 +207,19 @@ impl Journal {
         match self.enc {
             EncMode::Plain => {
                 let mut lenv = Vec::with_capacity(10);
-                put_uvarint(&mut lenv, plain.len() as u64);
+                write_uvarint(&mut lenv, plain.len() as u64)
+                    .expect("write to Vec never fails");
                 self.f.write_all(&lenv)?;
                 self.f.write_all(&plain)?;
                 self.f.flush()?;
                 Ok(())
             }
             EncMode::Aead { key, .. } => {
-                // Compute payload_off deterministically
                 let pos = self.f.stream_position()?;
-                let cipher_len = (plain.len() as u64) + 16; // AEAD tag
-                let varint_len = uvarint_len(cipher_len);
-                let payload_off = pos + varint_len as u64;
+                let cipher_len = (plain.len() as u64) + 16;
+                let vlen = uvarint_len(cipher_len);
+                let payload_off = pos + vlen as u64;
 
-                // Derive nonce from (payload_off, cipher_len)
                 let mut hasher = blake3::Hasher::new();
                 hasher.update(b"arxlog");
                 hasher.update(&self.salt);
@@ -277,11 +232,11 @@ impl Journal {
                 let cipher = XChaCha20Poly1305::new((&key).into());
                 let ct = cipher
                     .encrypt(&XNonce::from(nonce), plain.as_ref())
-                    .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "aead encrypt"))?;
+                    .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "journal aead encrypt"))?;
 
-                // Write length (of ciphertext) + ciphertext
                 let mut lenv = Vec::with_capacity(10);
-                put_uvarint(&mut lenv, ct.len() as u64);
+                write_uvarint(&mut lenv, ct.len() as u64)
+                    .expect("write to Vec never fails");
                 self.f.write_all(&lenv)?;
                 self.f.write_all(&ct)?;
                 self.f.flush()?;
@@ -289,7 +244,8 @@ impl Journal {
             }
         }
     }
-    /// Create an iterator starting after the header.
+
+    /// Create an iterator starting after the journal header.
     pub fn iter(&mut self) -> Result<JournalIter<'_>> {
         self.f.flush()?;
         self.f
