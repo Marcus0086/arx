@@ -66,10 +66,7 @@ RUN mkdir -p /data /etc/arx
 
 # Runtime configuration — all overridable via environment or compose
 ENV ROOT_DIR=/data \
-    PORT=50051 \
-    SEED_TENANT=main \
-    SEED_EMAIL=guptamarcus42@gmail.com \
-    SEED_PASSWORD=tyuraghavA#2
+    PORT=50051
 
 EXPOSE 50051
 
