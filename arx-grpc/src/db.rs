@@ -98,11 +98,31 @@ const TABLES: &[&str] = &[
 ];
 
 impl AuthDb {
+    /// Open the auth database.
+    ///
+    /// When `TURSO_URL` + `TURSO_AUTH_TOKEN` env vars are set the database is
+    /// served from Turso's cloud (recommended for production). Otherwise falls
+    /// back to a local SQLite file at `path`.
     pub async fn open(path: &Path) -> Result<Self, String> {
-        let db = libsql::Builder::new_local(path)
-            .build()
-            .await
-            .map_err(|e| e.to_string())?;
+        let turso_url = std::env::var("TURSO_URL").ok();
+        let turso_token = std::env::var("TURSO_AUTH_TOKEN").ok();
+
+        let db = match (turso_url.as_deref(), turso_token.as_deref()) {
+            (Some(url), Some(token)) if !url.is_empty() && !token.is_empty() => {
+                tracing::info!("auth DB: connecting to Turso remote database");
+                libsql::Builder::new_remote(url.to_string(), token.to_string())
+                    .build()
+                    .await
+                    .map_err(|e| e.to_string())?
+            }
+            _ => {
+                tracing::info!("auth DB: using local SQLite at {path:?}");
+                libsql::Builder::new_local(path)
+                    .build()
+                    .await
+                    .map_err(|e| e.to_string())?
+            }
+        };
 
         let conn = db.connect().map_err(|e| e.to_string())?;
 
