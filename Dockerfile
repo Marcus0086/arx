@@ -60,7 +60,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /build/target/release/arx-grpc /usr/local/bin/arx-grpc
 COPY scripts/seed.py /usr/local/bin/seed.py
-RUN chmod +x /usr/local/bin/seed.py
+COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/seed.py /usr/local/bin/entrypoint.sh
 
 RUN mkdir -p /data /etc/arx
 
@@ -73,4 +74,4 @@ EXPOSE 50051
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD wget -qO- http://localhost:${PORT}/health || exit 1
 
-ENTRYPOINT ["/usr/local/bin/arx-grpc"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
