@@ -54,18 +54,12 @@ ENTRYPOINT ["/usr/local/bin/arx"]
 FROM debian:bookworm-slim AS server
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
-        netcat-openbsd \
+        wget \
     && rm -rf /var/lib/apt/lists/*
-
-# Dedicated non-root service account
-RUN useradd --system --create-home --shell /usr/sbin/nologin arx
 
 COPY --from=builder /build/target/release/arx-grpc /usr/local/bin/arx-grpc
 
-# Ensure the data directory is writable by the service account at build time
-RUN mkdir -p /data /etc/arx && chown arx:arx /data
-
-USER arx
+RUN mkdir -p /data /etc/arx
 
 # Runtime configuration — all overridable via environment or compose
 # ARX_ADMIN_KEY: set this to enable admin RPCs (CreateTenant, CreateUser, etc.)
@@ -74,8 +68,7 @@ ENV ROOT_DIR=/data \
 
 EXPOSE 50051
 
-# TCP healthcheck — works without grpc-health-probe
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD nc -z localhost "${PORT}" || exit 1
+    CMD wget -qO- http://localhost:${PORT}/health || exit 1
 
 ENTRYPOINT ["/usr/local/bin/arx-grpc"]
