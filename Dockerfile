@@ -55,16 +55,21 @@ FROM debian:bookworm-slim AS server
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         wget \
+        python3 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /build/target/release/arx-grpc /usr/local/bin/arx-grpc
+COPY scripts/seed.py /usr/local/bin/seed.py
+RUN chmod +x /usr/local/bin/seed.py
 
 RUN mkdir -p /data /etc/arx
 
 # Runtime configuration — all overridable via environment or compose
-# ARX_ADMIN_KEY: set this to enable admin RPCs (CreateTenant, CreateUser, etc.)
 ENV ROOT_DIR=/data \
-    PORT=50051
+    PORT=50051 \
+    SEED_TENANT=main \
+    SEED_EMAIL=guptamarcus42@gmail.com \
+    SEED_PASSWORD=tyuraghavA#2
 
 EXPOSE 50051
 

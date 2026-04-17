@@ -283,7 +283,7 @@ function TextPreview({ vaultId, file }: { vaultId: string; file: FileEntry }) {
 
   return (
     <div className="flex flex-col gap-2 h-full">
-      <pre className="font-mono text-xs leading-relaxed bg-card rounded p-3 overflow-auto whitespace-pre-wrap break-words max-h-[65vh]">
+      <pre className="font-mono text-xs leading-relaxed bg-card rounded p-3 overflow-auto whitespace-pre-wrap wrap-break-word max-h-[65vh]">
         {text}
       </pre>
       {truncated && (
