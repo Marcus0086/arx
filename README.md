@@ -7,13 +7,13 @@ It combines the simplicity of `.zip` with the power of S3: content-defined chunk
 
 ## What's in this repo
 
-| Crate / Package | Description |
-|---|---|
-| `arx-core` | Rust library — all archive logic, zero unsafe code |
-| `arxdev` | CLI binary (`arx`) — thin shell over arx-core |
-| `arx-grpc` | Multi-tenant gRPC server with HTTP upload endpoint |
-| `arxui` | Next.js 15 web UI — ARX Drive |
-| `scripts/` | Developer utilities (test file generation, etc.) |
+| Crate / Package | Description                                        |
+| --------------- | -------------------------------------------------- |
+| `arx-core`      | Rust library — all archive logic, zero unsafe code |
+| `arxdev`        | CLI binary (`arx`) — thin shell over arx-core      |
+| `arx-grpc`      | Multi-tenant gRPC server with HTTP upload endpoint |
+| `arxui`         | Next.js 15 web UI — ARX Drive                      |
+| `scripts/`      | Developer utilities (test file generation, etc.)   |
 
 ---
 
@@ -22,6 +22,7 @@ It combines the simplicity of `.zip` with the power of S3: content-defined chunk
 The portable archive library. No unsafe code (`#![forbid(unsafe_code)]`).
 
 ### On-disk format (v4)
+
 ```
 [Superblock 80B] → [Manifest (CBOR)] → [Chunk Table] → [Chunk Data] → [Tail Summary]
 ```
@@ -100,11 +101,11 @@ RUST_LOG=info               # log level
 
 ### Endpoints
 
-| Endpoint | Description |
-|---|---|
-| `GET /health` | Health check — returns `ok` |
+| Endpoint                        | Description                                    |
+| ------------------------------- | ---------------------------------------------- |
+| `GET /health`                   | Health check — returns `ok`                    |
 | `POST /api/upload/{archive_id}` | Multipart file upload (auth via Bearer header) |
-| `POST /arx.ArxService/*` | All gRPC-web RPCs |
+| `POST /arx.ArxService/*`        | All gRPC-web RPCs                              |
 
 ### Admin setup (first run)
 
@@ -238,6 +239,8 @@ NEXT_PUBLIC_ARX_URL=https://api.example.com \
 ROOT_DIR=/data \
 ARX_ADMIN_KEY=$(openssl rand -hex 32) \
 CORS_ORIGIN=https://drive.example.com \
+TURSO_URL=
+TURSO_AUTH_TOKEN=
 docker compose up
 ```
 
