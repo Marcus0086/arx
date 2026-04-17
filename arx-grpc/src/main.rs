@@ -169,6 +169,6 @@ async fn shutdown_signal() {
 
     tokio::select! {
         _ = ctrl_c => tracing::info!("received Ctrl+C, shutting down…"),
-        _ = sigterm => tracing::info!("received SIGTERM, shutting down…"),
+        _ = sigterm => tracing::info!("received SIGTERM, shutting down successfully…"),
     }
 }
