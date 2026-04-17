@@ -29,7 +29,10 @@ pub fn read_uvarint<R: Read>(r: &mut R) -> io::Result<Option<u64>> {
             Err(e) => return Err(e),
         }
     }
-    Err(io::Error::new(io::ErrorKind::InvalidData, "varint too long"))
+    Err(io::Error::new(
+        io::ErrorKind::InvalidData,
+        "varint too long",
+    ))
 }
 
 /// Number of bytes the varint encoding of `x` occupies.
@@ -56,7 +59,18 @@ mod tests {
 
     #[test]
     fn test_roundtrip_boundary_values() {
-        for v in [0u64, 1, 127, 128, 255, 300, 16383, 16384, u32::MAX as u64, u64::MAX] {
+        for v in [
+            0u64,
+            1,
+            127,
+            128,
+            255,
+            300,
+            16383,
+            16384,
+            u32::MAX as u64,
+            u64::MAX,
+        ] {
             roundtrip(v);
         }
     }

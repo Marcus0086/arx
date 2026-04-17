@@ -78,8 +78,7 @@ impl DeltaStore {
                     .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "aead encrypt"))?;
 
                 let mut lenv = Vec::with_capacity(10);
-                write_uvarint(&mut lenv, ct.len() as u64)
-                    .expect("write to Vec never fails");
+                write_uvarint(&mut lenv, ct.len() as u64).expect("write to Vec never fails");
                 self.f.write_all(&lenv)?;
                 self.f.write_all(&ct)?;
                 self.f.flush()?;

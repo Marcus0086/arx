@@ -41,11 +41,7 @@ fn repo_from_args(
     key_hex: Option<String>,
     password: Option<String>,
 ) -> Result<Box<dyn ArchiveRepo>> {
-    let aead_key = resolve_key(
-        &archive,
-        key_hex.as_deref(),
-        password.as_deref(),
-    )?;
+    let aead_key = resolve_key(&archive, key_hex.as_deref(), password.as_deref())?;
     let params = OpenParams {
         archive_path: archive,
         aead_key,
@@ -125,7 +121,10 @@ pub fn handle_list(
     password: Option<String>,
 ) -> Result<()> {
     let aead_key = resolve_key(&archive, key_hex.as_deref(), password.as_deref())?;
-    let opts = aead_key.map(|k| ListOptions { aead_key: Some(k), key_salt: [0u8; 32] });
+    let opts = aead_key.map(|k| ListOptions {
+        aead_key: Some(k),
+        key_salt: [0u8; 32],
+    });
     list(&archive, opts.as_ref())
 }
 
@@ -136,7 +135,11 @@ pub fn handle_extract(
     password: Option<String>,
 ) -> Result<()> {
     let aead_key = resolve_key(&archive, key_hex.as_deref(), password.as_deref())?;
-    let opts = aead_key.map(|k| ExtractOptions { aead_key: Some(k), key_salt: [0u8; 32], password: None });
+    let opts = aead_key.map(|k| ExtractOptions {
+        aead_key: Some(k),
+        key_salt: [0u8; 32],
+        password: None,
+    });
     extract(&archive, &dest, opts.as_ref())
 }
 
@@ -146,7 +149,11 @@ pub fn handle_verify(
     password: Option<String>,
 ) -> Result<()> {
     let aead_key = resolve_key(&archive, key_hex.as_deref(), password.as_deref())?;
-    let opts = aead_key.map(|k| ExtractOptions { aead_key: Some(k), key_salt: [0u8; 32], password: None });
+    let opts = aead_key.map(|k| ExtractOptions {
+        aead_key: Some(k),
+        key_salt: [0u8; 32],
+        password: None,
+    });
     verify(&archive, opts.as_ref())?;
     eprintln!("verify: OK");
     Ok(())
@@ -165,7 +172,13 @@ pub fn handle_issue(
         .map(|hex| parse_hex_array::<32>(&hex))
         .transpose()?;
     CrudArchive::issue_archive(
-        &out, &label, &owner, &notes, aead_key, [0u8; 32], deterministic,
+        &out,
+        &label,
+        &owner,
+        &notes,
+        aead_key,
+        [0u8; 32],
+        deterministic,
     )?;
     // If password given, re-derive key won't work here since archive just created;
     // password is handled via PackOptions.password in issue_archive already
@@ -209,7 +222,9 @@ pub fn handle_chunk_cat(
     let mut buf = [0u8; 64 * 1024];
     loop {
         let n = reader.read(&mut buf)?;
-        if n == 0 { break; }
+        if n == 0 {
+            break;
+        }
         out.write_all(&buf[..n])?;
     }
     Ok(())
@@ -234,7 +249,9 @@ pub fn handle_chunk_get(
     let mut buf = [0u8; 256 * 1024];
     loop {
         let n = reader.read(&mut buf)?;
-        if n == 0 { break; }
+        if n == 0 {
+            break;
+        }
         file.write_all(&buf[..n])?;
     }
     Ok(())
@@ -255,7 +272,10 @@ pub fn handle_crud_add(
     if recursive && src.is_dir() {
         let base = src.clone();
         let dst_root = Path::new(&dst);
-        for entry in walkdir::WalkDir::new(&src).into_iter().filter_map(|e| e.ok()) {
+        for entry in walkdir::WalkDir::new(&src)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             if entry.file_type().is_file() {
                 let p = entry.path().to_path_buf();
                 let rel = p.strip_prefix(&base).unwrap();
@@ -317,7 +337,10 @@ pub fn handle_crud_ls(
     let aead_key = crud_key(&archive, key_hex, password)?;
     let arc = CrudArchive::open_with_crypto(&archive, aead_key, [0u8; 32])?;
     let iter = arc.index.by_path.iter().filter(|(p, _)| {
-        prefix.as_ref().map(|pref| p.starts_with(pref)).unwrap_or(true)
+        prefix
+            .as_ref()
+            .map(|pref| p.starts_with(pref))
+            .unwrap_or(true)
     });
     if long {
         for (p, e) in iter {
@@ -360,7 +383,8 @@ pub fn handle_crud_sync(
 ) -> Result<()> {
     let aead_key = crud_key(&archive, key_hex, password)?;
     let out_path = out.as_deref();
-    let display_out = out.as_ref()
+    let display_out = out
+        .as_ref()
         .map(|p| p.display().to_string())
         .unwrap_or_else(|| format!("{} (in-place)", archive.display()));
     CrudArchive::sync_to_base(
@@ -389,7 +413,9 @@ pub fn handle_crud_cat(
     let mut buf = [0u8; 64 * 1024];
     loop {
         let n = r.read(&mut buf)?;
-        if n == 0 { break; }
+        if n == 0 {
+            break;
+        }
         out.write_all(&buf[..n])?;
     }
     Ok(())
@@ -409,7 +435,9 @@ pub fn handle_crud_get(
     let mut buf = [0u8; 256 * 1024];
     loop {
         let n = r.read(&mut buf)?;
-        if n == 0 { break; }
+        if n == 0 {
+            break;
+        }
         file.write_all(&buf[..n])?;
     }
     Ok(())

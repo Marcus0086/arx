@@ -6,8 +6,7 @@ use argon2::{Algorithm, Argon2, Params, Version};
 /// These are conservative interactive-login parameters — fast enough for CLI
 /// use (< 1 s on modern hardware) while resisting GPU brute-force.
 pub fn derive_key(password: &str, salt: &[u8; 32]) -> [u8; 32] {
-    let params = Params::new(65_536, 3, 4, Some(32))
-        .expect("Argon2 params are valid");
+    let params = Params::new(65_536, 3, 4, Some(32)).expect("Argon2 params are valid");
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
     let mut out = [0u8; 32];
     argon2

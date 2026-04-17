@@ -48,6 +48,7 @@ pub mod read {
     pub mod extract;
     pub mod opened;
     pub mod reader;
+    pub mod stats;
     pub mod stream;
 }
 

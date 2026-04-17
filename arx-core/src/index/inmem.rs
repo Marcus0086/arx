@@ -98,8 +98,7 @@ impl InMemIndex {
             LogRecord::Delete { path } => {
                 if let Some(e) = self.by_path.remove(path) {
                     self.stats.files = self.stats.files.saturating_sub(1);
-                    self.stats.logical_bytes =
-                        self.stats.logical_bytes.saturating_sub(e.size);
+                    self.stats.logical_bytes = self.stats.logical_bytes.saturating_sub(e.size);
                 }
             }
             LogRecord::Rename { from, to } => {

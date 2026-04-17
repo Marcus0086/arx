@@ -3,11 +3,13 @@ use crate::codec::zstdc::ZstdCompressor;
 use crate::codec::{CodecId, Compressor};
 use crate::container::chunktab::{ChunkEntry, ENTRY_SIZE, write_table};
 use crate::container::manifest::{ChunkRef, DirEntry, FileEntry, Manifest, Meta};
-use crate::container::superblock::{FLAG_ENCRYPTED, FLAG_KDF_PASSWORD, HEADER_LEN, Superblock, VERSION};
-use crate::crypto::kdf;
-use crate::crypto::nonce::random_salt;
+use crate::container::superblock::{
+    FLAG_ENCRYPTED, FLAG_KDF_PASSWORD, HEADER_LEN, Superblock, VERSION,
+};
 use crate::container::tail::TailSummary;
 use crate::crypto::aead::{AeadKey, Region, TAG_LEN, derive_nonce, seal_whole};
+use crate::crypto::kdf;
+use crate::crypto::nonce::random_salt;
 use crate::error::Result;
 
 use blake3;
@@ -202,15 +204,31 @@ pub fn pack(inputs: &[&Path], out: &Path, opts: Option<&PackOptions>) -> Result<
 
     // ── Manifest planning ────────────────────────────────────────────────────
     let deterministic = opts.map(|o| o.deterministic).unwrap_or(false);
-    let created = if deterministic { 0 } else { OffsetDateTime::now_utc().unix_timestamp() };
+    let created = if deterministic {
+        0
+    } else {
+        OffsetDateTime::now_utc().unix_timestamp()
+    };
 
     // Resolve encryption key: raw key > password > none.
     // Generate a random kdf_salt for every archive (even unencrypted) so it's always present.
-    let kdf_salt: [u8; 32] = opts.map(|o| {
-        if o.key_salt != [0u8; 32] { o.key_salt }
-        else if deterministic { [0u8; 32] }
-        else { random_salt() }
-    }).unwrap_or_else(|| if deterministic { [0u8; 32] } else { random_salt() });
+    let kdf_salt: [u8; 32] = opts
+        .map(|o| {
+            if o.key_salt != [0u8; 32] {
+                o.key_salt
+            } else if deterministic {
+                [0u8; 32]
+            } else {
+                random_salt()
+            }
+        })
+        .unwrap_or_else(|| {
+            if deterministic {
+                [0u8; 32]
+            } else {
+                random_salt()
+            }
+        });
 
     let (enc, password_derived) = if let Some(raw) = opts.and_then(|o| o.aead_key) {
         (Some((AeadKey(raw), kdf_salt)), false)
@@ -323,7 +341,16 @@ pub fn pack(inputs: &[&Path], out: &Path, opts: Option<&PackOptions>) -> Result<
     h_manifest.update(&manifest_plain);
 
     let enc_enabled = enc.is_some();
-    let flags = if enc_enabled { FLAG_ENCRYPTED | if password_derived { FLAG_KDF_PASSWORD } else { 0 } } else { 0 };
+    let flags = if enc_enabled {
+        FLAG_ENCRYPTED
+            | if password_derived {
+                FLAG_KDF_PASSWORD
+            } else {
+                0
+            }
+    } else {
+        0
+    };
 
     let (manifest_bytes, manifest_len) = if let Some((ref key, salt)) = enc {
         let nonce = derive_nonce(&salt, Region::Manifest, 0);

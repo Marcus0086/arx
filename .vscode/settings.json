@@ -1,21 +1,31 @@
 {
-    // Don’t require rustup (we use Nix)
-    "rust-analyzer.rustup.enable": false,
-  
-    "rust-analyzer.check.allTargets": true,
-  
-    // Speed & noise
-    "rust-analyzer.files.excludeDirs": ["target"],
-    "rust-analyzer.cargo.features": "all",
-  
-    // Optional: if your workspace is nonstandard, point to root Cargo.toml
-    // "rust-analyzer.linkedProjects": ["./Cargo.toml"],
-  
-    // Nix projects typically have many symlinks; reduce file watcher load
-    "files.watcherExclude": {
-      "**/target/**": true,
-      "**/.direnv/**": true,
-      "**/.git/**": false
-    }
+  // ── Format on save ────────────────────────────────────────────────────────
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer"
+  },
+  "[toml]": {
+    "editor.defaultFormatter": "tamasfe.even-better-toml"
+  },
+  "prettier.configPath": ".prettierrc.json",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+
+  // ── Rust analyzer ─────────────────────────────────────────────────────────
+  "rust-analyzer.rustup.enable": false,
+  "rust-analyzer.check.allTargets": true,
+  "rust-analyzer.files.excludeDirs": ["target"],
+  "rust-analyzer.cargo.features": "all",
+
+  // ── File watcher ──────────────────────────────────────────────────────────
+  "files.watcherExclude": {
+    "**/target/**": true,
+    "**/.direnv/**": true,
+    "**/node_modules/**": true,
+    "**/.next/**": true,
+    "**/.git/**": false
   }
+}
   

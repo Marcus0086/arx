@@ -1,6 +1,6 @@
+use arx_core::read::extract::ExtractOptions;
 /// Round-trip integration tests: pack → extract → compare content.
 use arx_core::{PackOptions, extract, pack};
-use arx_core::read::extract::ExtractOptions;
 use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
@@ -21,7 +21,12 @@ fn compare_trees(src: &Path, dst: &Path) {
         for entry in walkdir::WalkDir::new(base).sort_by_file_name() {
             let entry = entry.unwrap();
             if entry.file_type().is_file() {
-                let rel = entry.path().strip_prefix(base).unwrap().to_string_lossy().into_owned();
+                let rel = entry
+                    .path()
+                    .strip_prefix(base)
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned();
                 let content = fs::read(entry.path()).unwrap();
                 out.push((rel, content));
             }
@@ -62,7 +67,11 @@ fn test_deterministic_roundtrip() {
     write_tree(src.path());
     let archive = tmp.path().join("det.arx");
 
-    let opts = PackOptions { deterministic: true, min_gain: 0.05, ..Default::default() };
+    let opts = PackOptions {
+        deterministic: true,
+        min_gain: 0.05,
+        ..Default::default()
+    };
     pack(&[src.path()], &archive, Some(&opts)).expect("deterministic pack failed");
 
     extract(&archive, dst.path(), None).expect("extract failed");
@@ -86,11 +95,17 @@ fn test_encrypted_roundtrip() {
     let archive = tmp.path().join("enc.arx");
     let key = [0x42u8; 32];
 
-    let pack_opts = PackOptions { aead_key: Some(key), ..Default::default() };
+    let pack_opts = PackOptions {
+        aead_key: Some(key),
+        ..Default::default()
+    };
     pack(&[src.path()], &archive, Some(&pack_opts)).expect("encrypted pack failed");
 
     // Extract with correct key → success
-    let ext_opts = ExtractOptions { aead_key: Some(key), ..Default::default() };
+    let ext_opts = ExtractOptions {
+        aead_key: Some(key),
+        ..Default::default()
+    };
     extract(&archive, dst.path(), Some(&ext_opts)).expect("encrypted extract failed");
     compare_trees(src.path(), dst.path());
 }
@@ -106,10 +121,16 @@ fn test_encrypted_wrong_key_fails() {
     let key = [0x11u8; 32];
     let wrong_key = [0x22u8; 32];
 
-    let pack_opts = PackOptions { aead_key: Some(key), ..Default::default() };
+    let pack_opts = PackOptions {
+        aead_key: Some(key),
+        ..Default::default()
+    };
     pack(&[src.path()], &archive, Some(&pack_opts)).unwrap();
 
-    let ext_opts = ExtractOptions { aead_key: Some(wrong_key), ..Default::default() };
+    let ext_opts = ExtractOptions {
+        aead_key: Some(wrong_key),
+        ..Default::default()
+    };
     let result = extract(&archive, dst.path(), Some(&ext_opts));
     assert!(result.is_err(), "extract with wrong key should fail");
     let err_str = result.unwrap_err().to_string();
@@ -128,11 +149,17 @@ fn test_password_roundtrip() {
     fs::write(src.path().join("file.txt"), b"password protected").unwrap();
     let archive = tmp.path().join("pw.arx");
 
-    let pack_opts = PackOptions { password: Some("hunter2".into()), ..Default::default() };
+    let pack_opts = PackOptions {
+        password: Some("hunter2".into()),
+        ..Default::default()
+    };
     pack(&[src.path()], &archive, Some(&pack_opts)).expect("password pack failed");
 
     // Extract using the password (resolved via superblock kdf_salt)
-    let ext_opts = ExtractOptions { password: Some("hunter2".into()), ..Default::default() };
+    let ext_opts = ExtractOptions {
+        password: Some("hunter2".into()),
+        ..Default::default()
+    };
     extract(&archive, dst.path(), Some(&ext_opts)).expect("password extract failed");
     let content = fs::read(dst.path().join("file.txt")).unwrap();
     assert_eq!(content, b"password protected");

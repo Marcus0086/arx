@@ -17,4 +17,4 @@ dataset
 # Docker — real tenant keys (example file is tracked, populated config is not)
 config/tenants.json
 .env
-MONKY-V0
+node_modules

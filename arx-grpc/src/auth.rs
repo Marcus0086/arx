@@ -7,8 +7,8 @@ use crate::db::AuthDb;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JwtClaims {
-    pub sub: String,  // user_id
-    pub tid: String,  // tenant_id
+    pub sub: String, // user_id
+    pub tid: String, // tenant_id
     pub exp: usize,
     pub iat: usize,
 }
@@ -38,10 +38,7 @@ pub async fn extract_tenant(token: &str, db: &AuthDb) -> Result<String, tonic::S
 }
 
 /// Async: resolve (tenant_id, user_id) from a bearer token string.
-pub async fn extract_identity(
-    token: &str,
-    db: &AuthDb,
-) -> Result<(String, String), tonic::Status> {
+pub async fn extract_identity(token: &str, db: &AuthDb) -> Result<(String, String), tonic::Status> {
     if token.contains('.') {
         let secret = db
             .get_jwt_secret()

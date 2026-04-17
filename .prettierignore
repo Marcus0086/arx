@@ -1,0 +1,7 @@
+**/node_modules
+**/.next
+**/target
+**/dist
+**/build
+arxui/src/gen
+arxui/pnpm-lock.yaml

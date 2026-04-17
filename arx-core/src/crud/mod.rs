@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::chunking::fastcdc::{ChunkParams, StreamingChunker};
-use crate::codec::{CodecId, Compressor, get_decoder_u8};
 use crate::codec::zstdc::ZstdCompressor;
+use crate::codec::{CodecId, Compressor, get_decoder_u8};
 use crate::container::delta::DeltaStore;
 use crate::container::journal::{ChunkRef, EncMode, Journal, Loc, LogRecord};
 use crate::error::{ArxError, Result};
@@ -45,7 +45,10 @@ impl CrudArchive {
         let delta_path = with_ext(base, "arx.delta");
 
         let enc = if let Some(key) = aead_key {
-            EncMode::Aead { key, salt: key_salt }
+            EncMode::Aead {
+                key,
+                salt: key_salt,
+            }
         } else {
             EncMode::Plain
         };
@@ -113,11 +116,12 @@ impl CrudArchive {
             let mut compressed = Vec::with_capacity(n);
             zstd.compress(&mut buf.as_slice(), &mut compressed, 3)?;
 
-            let (payload, codec) = if (n as f64 - compressed.len() as f64) >= n as f64 * min_gain as f64 {
-                (compressed, CodecId::Zstd)
-            } else {
-                (buf, CodecId::Store)
-            };
+            let (payload, codec) =
+                if (n as f64 - compressed.len() as f64) >= n as f64 * min_gain as f64 {
+                    (compressed, CodecId::Zstd)
+                } else {
+                    (buf, CodecId::Store)
+                };
 
             let (off, len) = self.delta.append_frame(&payload)?;
             chunk_refs.push(ChunkRef {
@@ -142,7 +146,9 @@ impl CrudArchive {
     }
 
     pub fn delete_path(&mut self, path: &str) -> Result<()> {
-        let rec = LogRecord::Delete { path: path.to_string() };
+        let rec = LogRecord::Delete {
+            path: path.to_string(),
+        };
         self.journal.append(&rec)?;
         self.index.apply(&rec);
         Ok(())
@@ -150,8 +156,14 @@ impl CrudArchive {
 
     pub fn delete_path_recursive(&mut self, path: &str) -> Result<()> {
         // Collect all overlay paths that are under `path`
-        let prefix = if path.ends_with('/') { path.to_string() } else { format!("{path}/") };
-        let to_delete: Vec<String> = self.index.by_path
+        let prefix = if path.ends_with('/') {
+            path.to_string()
+        } else {
+            format!("{path}/")
+        };
+        let to_delete: Vec<String> = self
+            .index
+            .by_path
             .keys()
             .filter(|p| *p == path || p.starts_with(&prefix))
             .cloned()
@@ -166,7 +178,10 @@ impl CrudArchive {
     }
 
     pub fn rename(&mut self, from: &str, to: &str) -> Result<()> {
-        let rec = LogRecord::Rename { from: from.to_string(), to: to.to_string() };
+        let rec = LogRecord::Rename {
+            from: from.to_string(),
+            to: to.to_string(),
+        };
         self.journal.append(&rec)?;
         self.index.apply(&rec);
         Ok(())
@@ -179,7 +194,10 @@ impl CrudArchive {
     /// - Mixed base+delta files: not yet supported; returns an error suggesting `sync` first.
     pub fn open_reader(&self, path: &str) -> Result<Box<dyn Read + Send + '_>> {
         let entry = self.index.by_path.get(path).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::NotFound, format!("path not found: {path}"))
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("path not found: {path}"),
+            )
         })?;
 
         let all_base = entry.chunks.iter().all(|c| c.loc == Loc::Base);
@@ -227,12 +245,20 @@ impl CrudArchive {
 
         // Added (in overlay, not in base)
         for path in overlay_paths.difference(&base_paths) {
-            entries.push(DiffEntry { kind: "A", path: path.to_string(), from: None });
+            entries.push(DiffEntry {
+                kind: "A",
+                path: path.to_string(),
+                from: None,
+            });
         }
 
         // Deleted (in base, not in overlay)
         for path in base_paths.difference(&overlay_paths) {
-            entries.push(DiffEntry { kind: "D", path: path.to_string(), from: None });
+            entries.push(DiffEntry {
+                kind: "D",
+                path: path.to_string(),
+                from: None,
+            });
         }
 
         // Modified (in both, but overlay has delta chunks)
@@ -240,7 +266,11 @@ impl CrudArchive {
             if let Some(entry) = self.index.by_path.get(*path) {
                 let has_delta = entry.chunks.iter().any(|c| c.loc == Loc::Delta);
                 if has_delta {
-                    entries.push(DiffEntry { kind: "M", path: path.to_string(), from: None });
+                    entries.push(DiffEntry {
+                        kind: "M",
+                        path: path.to_string(),
+                        from: None,
+                    });
                 }
             }
         }
@@ -284,7 +314,9 @@ impl CrudArchive {
         };
 
         // Determine output path
-        let final_out = out.map(|p| p.to_path_buf()).unwrap_or_else(|| archive.to_path_buf());
+        let final_out = out
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| archive.to_path_buf());
         let tmp_out = final_out.with_extension("arx.tmp");
         pack(&refs, &tmp_out, Some(&opts))?;
 
@@ -311,9 +343,21 @@ impl CrudArchive {
             min_gain: 0.05,
             aead_key,
             key_salt,
-            meta_label: if label.is_empty() { None } else { Some(label.to_string()) },
-            meta_owner: if owner.is_empty() { None } else { Some(owner.to_string()) },
-            meta_notes: if notes.is_empty() { None } else { Some(notes.to_string()) },
+            meta_label: if label.is_empty() {
+                None
+            } else {
+                Some(label.to_string())
+            },
+            meta_owner: if owner.is_empty() {
+                None
+            } else {
+                Some(owner.to_string())
+            },
+            meta_notes: if notes.is_empty() {
+                None
+            } else {
+                Some(notes.to_string())
+            },
             ..Default::default()
         };
         pack(&empty, out, Some(&opts))?;

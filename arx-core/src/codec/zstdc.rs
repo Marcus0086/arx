@@ -9,7 +9,7 @@ impl Compressor for ZstdCompressor {
         CodecId::Zstd
     }
     fn compress(&self, src: &mut dyn Read, dst: &mut dyn Write, level: i32) -> Result<u64> {
-        let mut enc = zstd::stream::Encoder::new(dst, level.max(1))?;
+        let enc = zstd::stream::Encoder::new(dst, level.max(1))?;
         // Optional: enable multithreading when compiled with the "zstdmt" feature.
         #[cfg(feature = "zstdmt")]
         {
