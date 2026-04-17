@@ -5,10 +5,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSdk } from "@/src/lib/sdk-context";
 import { VaultCard } from "@/components/arx/vault-card";
 import { CreateVaultDialog } from "@/components/arx/create-vault-dialog";
+import { DashboardPageLayout } from "@/components/arx/dashboard-page-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, HardDrive } from "lucide-react";
-import type { Vault } from "@/src/sdk";
 
 export default function VaultsPage() {
   const sdk = useSdk();
@@ -30,38 +30,31 @@ export default function VaultsPage() {
     v.name.toLowerCase().includes(search.toLowerCase()),
   );
 
+  const count = vaults.length;
+  const description = `${count} vault${count !== 1 ? "s" : ""} · ENCRYPTED`;
+
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <HardDrive className="w-6 h-6 text-primary" />
-            My Vaults
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {vaults.length} vault{vaults.length !== 1 ? "s" : ""} · encrypted archive
-            storage
-          </p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)} className="gap-2">
-          <Plus className="w-4 h-4" />
+    <DashboardPageLayout header={{ title: "MY VAULTS", icon: HardDrive, description }}>
+      {/* Toolbar */}
+      <div className="flex items-center gap-3 justify-between">
+        {vaults.length > 4 ? (
+          <div className="relative max-w-xs flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search vaults…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        ) : (
+          <div />
+        )}
+        <Button onClick={() => setCreateOpen(true)}>
+          <Plus />
           New Vault
         </Button>
       </div>
-
-      {/* Search */}
-      {vaults.length > 4 && (
-        <div className="relative max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search vaults…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-      )}
 
       {/* Vault Grid */}
       {isLoading ? (
@@ -69,7 +62,7 @@ export default function VaultsPage() {
       ) : filtered.length === 0 ? (
         <EmptyState onCreate={() => setCreateOpen(true)} />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((vault) => (
             <VaultCard
               key={vault.id}
@@ -85,15 +78,15 @@ export default function VaultsPage() {
         onOpenChange={setCreateOpen}
         onCreated={() => qc.invalidateQueries({ queryKey: ["vaults"] })}
       />
-    </div>
+    </DashboardPageLayout>
   );
 }
 
 function VaultGridSkeleton() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="h-44 rounded-xl bg-muted/40 animate-pulse" />
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="h-44 rounded-xl bg-pop animate-pulse" />
       ))}
     </div>
   );
@@ -102,17 +95,17 @@ function VaultGridSkeleton() {
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center space-y-4">
-      <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-muted/50 border border-border/50">
+      <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-pop border border-border/50">
         <HardDrive className="w-8 h-8 text-muted-foreground/50" />
       </div>
       <div>
-        <p className="font-medium">No vaults yet</p>
+        <p className="font-display text-xl uppercase">No vaults yet</p>
         <p className="text-sm text-muted-foreground mt-1">
           Create your first vault to start storing encrypted files
         </p>
       </div>
-      <Button onClick={onCreate} variant="outline" className="gap-2">
-        <Plus className="w-4 h-4" />
+      <Button onClick={onCreate} variant="outline">
+        <Plus />
         Create a vault
       </Button>
     </div>

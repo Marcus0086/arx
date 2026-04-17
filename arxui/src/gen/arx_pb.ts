@@ -405,6 +405,20 @@ export class ArchiveStats extends Message<ArchiveStats> {
    */
   storedBytes = protoInt64.zero;
 
+  /**
+   * stored / logical (0..1 when compressed)
+   *
+   * @generated from field: float compression_ratio = 6;
+   */
+  compressionRatio = 0;
+
+  /**
+   * logical - stored
+   *
+   * @generated from field: uint64 savings_bytes = 7;
+   */
+  savingsBytes = protoInt64.zero;
+
   constructor(data?: PartialMessage<ArchiveStats>) {
     super();
     proto3.util.initPartial(data, this);
@@ -418,6 +432,8 @@ export class ArchiveStats extends Message<ArchiveStats> {
     { no: 3, name: "chunks", kind: "scalar", T: 4 /* ScalarType.UINT64 */ },
     { no: 4, name: "logical_bytes", kind: "scalar", T: 4 /* ScalarType.UINT64 */ },
     { no: 5, name: "stored_bytes", kind: "scalar", T: 4 /* ScalarType.UINT64 */ },
+    { no: 6, name: "compression_ratio", kind: "scalar", T: 2 /* ScalarType.FLOAT */ },
+    { no: 7, name: "savings_bytes", kind: "scalar", T: 4 /* ScalarType.UINT64 */ },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): ArchiveStats {
@@ -1157,6 +1173,16 @@ export class CrudLsRequest extends Message<CrudLsRequest> {
    */
   key?: KeyMaterial;
 
+  /**
+   * @generated from field: uint32 offset = 5;
+   */
+  offset = 0;
+
+  /**
+   * @generated from field: uint32 limit = 6;
+   */
+  limit = 0;
+
   constructor(data?: PartialMessage<CrudLsRequest>) {
     super();
     proto3.util.initPartial(data, this);
@@ -1169,6 +1195,8 @@ export class CrudLsRequest extends Message<CrudLsRequest> {
     { no: 2, name: "prefix", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 3, name: "long_format", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
     { no: 4, name: "key", kind: "message", T: KeyMaterial },
+    { no: 5, name: "offset", kind: "scalar", T: 13 /* ScalarType.UINT32 */ },
+    { no: 6, name: "limit", kind: "scalar", T: 13 /* ScalarType.UINT32 */ },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): CrudLsRequest {
@@ -1246,6 +1274,11 @@ export class CrudLsResponse extends Message<CrudLsResponse> {
    */
   entries: CrudLsEntry[] = [];
 
+  /**
+   * @generated from field: uint32 total_count = 2;
+   */
+  totalCount = 0;
+
   constructor(data?: PartialMessage<CrudLsResponse>) {
     super();
     proto3.util.initPartial(data, this);
@@ -1255,6 +1288,7 @@ export class CrudLsResponse extends Message<CrudLsResponse> {
   static readonly typeName = "arx.CrudLsResponse";
   static readonly fields: FieldList = proto3.util.newFieldList(() => [
     { no: 1, name: "entries", kind: "message", T: CrudLsEntry, repeated: true },
+    { no: 2, name: "total_count", kind: "scalar", T: 13 /* ScalarType.UINT32 */ },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): CrudLsResponse {
@@ -1328,12 +1362,22 @@ export class CrudSyncRequest extends Message<CrudSyncRequest> {
  */
 export class CrudSyncResponse extends Message<CrudSyncResponse> {
   /**
-   * @generated from field: string new_archive_id = 1;
+   * @generated from field: bool ok = 1;
    */
-  newArchiveId = "";
+  ok = false;
 
   /**
-   * @generated from field: string error = 2;
+   * @generated from field: uint64 size_bytes = 2;
+   */
+  sizeBytes = protoInt64.zero;
+
+  /**
+   * @generated from field: arx.ArchiveStats stats = 3;
+   */
+  stats?: ArchiveStats;
+
+  /**
+   * @generated from field: string error = 4;
    */
   error = "";
 
@@ -1345,8 +1389,10 @@ export class CrudSyncResponse extends Message<CrudSyncResponse> {
   static readonly runtime: typeof proto3 = proto3;
   static readonly typeName = "arx.CrudSyncResponse";
   static readonly fields: FieldList = proto3.util.newFieldList(() => [
-    { no: 1, name: "new_archive_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 2, name: "error", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 1, name: "ok", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
+    { no: 2, name: "size_bytes", kind: "scalar", T: 4 /* ScalarType.UINT64 */ },
+    { no: 3, name: "stats", kind: "message", T: ArchiveStats },
+    { no: 4, name: "error", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): CrudSyncResponse {
@@ -1675,6 +1721,11 @@ export class ArchiveInfo extends Message<ArchiveInfo> {
    */
   encrypted = false;
 
+  /**
+   * @generated from field: arx.ArchiveStats stats = 6;
+   */
+  stats?: ArchiveStats;
+
   constructor(data?: PartialMessage<ArchiveInfo>) {
     super();
     proto3.util.initPartial(data, this);
@@ -1688,6 +1739,7 @@ export class ArchiveInfo extends Message<ArchiveInfo> {
     { no: 3, name: "size_bytes", kind: "scalar", T: 4 /* ScalarType.UINT64 */ },
     { no: 4, name: "created_at", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 5, name: "encrypted", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
+    { no: 6, name: "stats", kind: "message", T: ArchiveStats },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): ArchiveInfo {
@@ -1772,6 +1824,95 @@ export class ListArchivesResp extends Message<ListArchivesResp> {
 
   static equals(a: ListArchivesResp | PlainMessage<ListArchivesResp> | undefined, b: ListArchivesResp | PlainMessage<ListArchivesResp> | undefined): boolean {
     return proto3.util.equals(ListArchivesResp, a, b);
+  }
+}
+
+/**
+ * Rename an existing archive. Stored in a per-archive meta.json sidecar; does
+ * not mutate the (immutable) archive manifest.
+ *
+ * @generated from message arx.RenameArchiveRequest
+ */
+export class RenameArchiveRequest extends Message<RenameArchiveRequest> {
+  /**
+   * @generated from field: string archive_id = 1;
+   */
+  archiveId = "";
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name = "";
+
+  constructor(data?: PartialMessage<RenameArchiveRequest>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "arx.RenameArchiveRequest";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "archive_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): RenameArchiveRequest {
+    return new RenameArchiveRequest().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): RenameArchiveRequest {
+    return new RenameArchiveRequest().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): RenameArchiveRequest {
+    return new RenameArchiveRequest().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: RenameArchiveRequest | PlainMessage<RenameArchiveRequest> | undefined, b: RenameArchiveRequest | PlainMessage<RenameArchiveRequest> | undefined): boolean {
+    return proto3.util.equals(RenameArchiveRequest, a, b);
+  }
+}
+
+/**
+ * @generated from message arx.RenameArchiveResponse
+ */
+export class RenameArchiveResponse extends Message<RenameArchiveResponse> {
+  /**
+   * @generated from field: bool ok = 1;
+   */
+  ok = false;
+
+  /**
+   * @generated from field: string error = 2;
+   */
+  error = "";
+
+  constructor(data?: PartialMessage<RenameArchiveResponse>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "arx.RenameArchiveResponse";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "ok", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
+    { no: 2, name: "error", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): RenameArchiveResponse {
+    return new RenameArchiveResponse().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): RenameArchiveResponse {
+    return new RenameArchiveResponse().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): RenameArchiveResponse {
+    return new RenameArchiveResponse().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: RenameArchiveResponse | PlainMessage<RenameArchiveResponse> | undefined, b: RenameArchiveResponse | PlainMessage<RenameArchiveResponse> | undefined): boolean {
+    return proto3.util.equals(RenameArchiveResponse, a, b);
   }
 }
 

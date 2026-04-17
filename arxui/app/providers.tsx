@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useState } from "react";
+import { Toaster } from "sonner";
 import { SdkProvider } from "@/src/lib/sdk-context";
 
 const ARX_URL = process.env.NEXT_PUBLIC_ARX_URL ?? "http://localhost:50051";
@@ -24,7 +25,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <SdkProvider baseUrl={ARX_URL}>
         {children}
-        <ReactQueryDevtools initialIsOpen={false} />
+        <Toaster position="bottom-right" theme="dark" />
+        {process.env.NODE_ENV === "development" && (
+          <ReactQueryDevtools initialIsOpen={false} />
+        )}
       </SdkProvider>
     </QueryClientProvider>
   );

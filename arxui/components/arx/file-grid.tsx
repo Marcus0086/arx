@@ -1,53 +1,128 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useSdk } from "@/src/lib/sdk-context";
-import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { Download, Film, FileText, Image, Music, Package, Trash2 } from "lucide-react";
+import {
+  Download,
+  Eye,
+  Film,
+  FileText,
+  Image,
+  Music,
+  Package,
+  Trash2,
+} from "lucide-react";
 import type { FileEntry } from "@/src/sdk";
-import { formatDistanceToNow } from "date-fns";
 
 interface FileGridProps {
   vaultId: string;
   files: FileEntry[];
+  onPreview: (file: FileEntry) => void;
   onDownload: (path: string) => void;
   onDelete: (path: string) => void;
 }
 
-export function FileGrid({ vaultId, files, onDownload, onDelete }: FileGridProps) {
-  const [selected, setSelected] = useState<string | null>(null);
+function getColCount(width: number): number {
+  if (width < 640) return 2;
+  if (width < 768) return 3;
+  if (width < 1024) return 4;
+  return 5;
+}
+
+export function FileGrid({
+  vaultId,
+  files,
+  onPreview,
+  onDownload,
+  onDelete,
+}: FileGridProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) =>
+      setContainerWidth(entry.contentRect.width),
+    );
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const colCount = containerWidth > 0 ? getColCount(containerWidth) : 5;
+  const rowHeight = containerWidth > 0 ? Math.floor(containerWidth / colCount) + 44 : 204;
+
+  // Chunk files into rows
+  const rows: FileEntry[][] = [];
+  for (let i = 0; i < files.length; i += colCount) {
+    rows.push(files.slice(i, i + colCount));
+  }
+
+  const estimateSize = useCallback(() => rowHeight, [rowHeight]);
+
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => containerRef.current,
+    estimateSize,
+    overscan: 3,
+  });
 
   return (
-    <>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-        {files.map((file) => (
-          <FileItem
-            key={file.path}
-            vaultId={vaultId}
-            file={file}
-            selected={selected === file.path}
-            onSelect={() => setSelected(file.path === selected ? null : file.path)}
-            onDownload={() => onDownload(file.path)}
-            onDelete={() => onDelete(file.path)}
-          />
+    <div
+      ref={containerRef}
+      style={{
+        height: "calc(100vh - 320px)",
+        minHeight: 300,
+        overflow: "auto",
+        position: "relative",
+      }}
+    >
+      <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+        {virtualizer.getVirtualItems().map((vRow) => (
+          <div
+            key={vRow.index}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: vRow.size,
+              transform: `translateY(${vRow.start}px)`,
+              display: "grid",
+              gridTemplateColumns: `repeat(${colCount}, 1fr)`,
+              gap: "1rem",
+              alignItems: "start",
+            }}
+          >
+            {rows[vRow.index].map((file) => (
+              <FileItem
+                key={file.path}
+                vaultId={vaultId}
+                file={file}
+                onPreview={() => onPreview(file)}
+                onDownload={() => onDownload(file.path)}
+                onDelete={() => onDelete(file.path)}
+              />
+            ))}
+          </div>
         ))}
       </div>
-    </>
+    </div>
   );
 }
 
 interface FileItemProps {
   vaultId: string;
   file: FileEntry;
-  selected: boolean;
-  onSelect: () => void;
+  onPreview: () => void;
   onDownload: () => void;
   onDelete: () => void;
 }
@@ -61,14 +136,7 @@ function getExt(path: string) {
   return path.split(".").pop()?.toLowerCase() ?? "";
 }
 
-function FileItem({
-  vaultId,
-  file,
-  selected,
-  onSelect,
-  onDownload,
-  onDelete,
-}: FileItemProps) {
+function FileItem({ vaultId, file, onPreview, onDownload, onDelete }: FileItemProps) {
   const ext = getExt(file.path);
   const isImage = IMAGE_EXTS.has(ext);
   const isVideo = VIDEO_EXTS.has(ext);
@@ -93,43 +161,59 @@ function FileItem({
     <ContextMenu>
       <ContextMenuTrigger>
         <div
-          className={`group flex flex-col gap-1.5 p-2 rounded-xl border cursor-pointer transition-all ${
-            selected
-              ? "border-primary bg-primary/5"
-              : "border-border/40 bg-card hover:border-border hover:bg-muted/30"
-          }`}
-          onClick={onSelect}
-          onDoubleClick={onDownload}
+          className="group relative flex flex-col gap-1 p-1.5 rounded-lg cursor-pointer transition-all bg-pop ring-1 ring-transparent hover:ring-border"
+          onClick={onPreview}
         >
+          {/* Hover delete button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity
+                       p-1 rounded bg-background/80 text-destructive hover:bg-destructive hover:text-white"
+            aria-label="Delete"
+          >
+            <Trash2 className="size-3" />
+          </button>
+
           {/* Thumbnail or icon */}
-          <div className="aspect-square rounded-lg overflow-hidden flex items-center justify-center bg-muted/40">
+          <div className="aspect-square rounded overflow-hidden flex items-center justify-center bg-card">
             {isImage && previewUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={previewUrl} alt={name} className="w-full h-full object-cover" />
             ) : isVideo ? (
-              <Film className="w-8 h-8 text-muted-foreground/50" />
+              <Film className="size-8 text-muted-foreground/50" />
             ) : AUDIO_EXTS.has(ext) ? (
-              <Music className="w-8 h-8 text-muted-foreground/50" />
+              <Music className="size-8 text-muted-foreground/50" />
             ) : ARCHIVE_EXTS.has(ext) ? (
-              <Package className="w-8 h-8 text-muted-foreground/50" />
+              <Package className="size-8 text-muted-foreground/50" />
+            ) : ext === "pdf" ? (
+              <FileText className="size-8 text-red-500/70" />
             ) : ["txt", "md", "json", "yaml", "toml", "rs", "ts", "tsx", "js"].includes(
                 ext,
               ) ? (
-              <FileText className="w-8 h-8 text-muted-foreground/50" />
+              <FileText className="size-8 text-muted-foreground/50" />
             ) : (
-              <Image className="w-8 h-8 text-muted-foreground/50" />
+              <Image className="size-8 text-muted-foreground/50" />
             )}
           </div>
 
           {/* Name & size */}
-          <div className="space-y-0.5 min-w-0">
-            <p className="text-xs font-medium truncate leading-tight">{name}</p>
-            <p className="text-[10px] text-muted-foreground">{formatBytes(file.size)}</p>
+          <div className="flex flex-col gap-0.5 min-w-0 px-1 pb-0.5">
+            <p className="text-xs truncate leading-tight">{name}</p>
+            <p className="text-[10px] uppercase text-muted-foreground tracking-wide">
+              {formatBytes(file.size)}
+            </p>
           </div>
         </div>
       </ContextMenuTrigger>
 
-      <ContextMenuContent className="w-40">
+      <ContextMenuContent className="w-44">
+        <ContextMenuItem onClick={onPreview} className="gap-2 text-sm">
+          <Eye className="w-3.5 h-3.5" />
+          Preview
+        </ContextMenuItem>
         <ContextMenuItem onClick={onDownload} className="gap-2 text-sm">
           <Download className="w-3.5 h-3.5" />
           Download

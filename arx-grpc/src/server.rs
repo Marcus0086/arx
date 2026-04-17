@@ -1,6 +1,7 @@
+use dashmap::DashMap;
 use std::path::Path;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::sync::{Mutex, mpsc};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status, Streaming};
 
@@ -23,13 +24,24 @@ pub struct ArxServiceImpl {
     pub store: Arc<ArchiveStore>,
     pub db: Arc<AuthDb>,
     pub admin_key: Arc<String>,
+    pub archive_locks: Arc<DashMap<String, Arc<Mutex<()>>>>,
+}
+
+impl ArxServiceImpl {
+    fn archive_lock(&self, tenant_id: &str, archive_id: &str) -> Arc<Mutex<()>> {
+        let key = format!("{tenant_id}:{archive_id}");
+        self.archive_locks
+            .entry(key)
+            .or_insert_with(|| Arc::new(Mutex::new(())))
+            .clone()
+    }
 }
 
 /// Map ArxError to tonic Status.
 fn arx_err(e: ArxError) -> Status {
     match e {
         ArxError::AeadError => Status::unauthenticated("AEAD authentication failed — wrong key"),
-        ArxError::Io(io) => Status::internal(io.to_string()),
+        ArxError::Io(_) => Status::internal("storage error"),
         ArxError::Format(msg) => Status::invalid_argument(msg),
     }
 }
@@ -369,20 +381,40 @@ impl ArxService for ArxServiceImpl {
             .map_err(|e| Status::internal(e.to_string()))?;
         let paths = self.store.archive_paths(&tenant_id, &archive_id);
 
+        let label = req.label.clone();
+        let owner = req.owner.clone();
+        let notes = req.notes.clone();
+        let deterministic = req.deterministic;
         tokio::task::spawn_blocking(move || {
             CrudArchive::issue_archive(
                 &paths.data,
-                &req.label,
-                &req.owner,
-                &req.notes,
+                &label,
+                &owner,
+                &notes,
                 aead_key,
                 [0u8; 32],
-                req.deterministic,
+                deterministic,
             )
         })
         .await
         .map_err(|e| Status::internal(e.to_string()))?
         .map_err(arx_err)?;
+
+        // Persist the display name in the mutable sidecar so it survives
+        // manifest regeneration during sync (and matches what the user sees
+        // immediately after creation).
+        let display_name = if !req.label.trim().is_empty() {
+            req.label.trim().to_string()
+        } else if !req.archive_name.trim().is_empty() {
+            req.archive_name.trim().to_string()
+        } else {
+            String::new()
+        };
+        if !display_name.is_empty() {
+            self.store
+                .write_label(&tenant_id, &archive_id, &display_name)
+                .map_err(|e| Status::internal(e.to_string()))?;
+        }
 
         Ok(Response::new(IssueResponse {
             archive_id,
@@ -412,6 +444,11 @@ impl ArxService for ArxServiceImpl {
 
         let archive_path = self.store.resolve(&tenant_id, &header.archive_id)?;
         let aead_key = resolve_key(&archive_path, header.key.as_ref())?;
+        let _lock = self
+            .archive_lock(&tenant_id, &header.archive_id)
+            .lock_owned()
+            .await;
+        tracing::info!(tenant_id = %tenant_id, archive_id = %header.archive_id, "crud_add_stream");
 
         let tmp = tempfile::tempdir().map_err(|e| Status::internal(e.to_string()))?;
         let mut files: Vec<(String, std::path::PathBuf, u32, u64)> = Vec::new();
@@ -482,6 +519,11 @@ impl ArxService for ArxServiceImpl {
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
         let path = req.path.clone();
         let recursive = req.recursive;
+        let _lock = self
+            .archive_lock(&tenant_id, &req.archive_id)
+            .lock_owned()
+            .await;
+        tracing::info!(tenant_id = %tenant_id, archive_id = %req.archive_id, path = %path, "crud_rm");
 
         tokio::task::spawn_blocking(move || -> arx_core::error::Result<()> {
             let mut arc = CrudArchive::open_with_crypto(&archive_path, aead_key, [0u8; 32])?;
@@ -514,6 +556,11 @@ impl ArxService for ArxServiceImpl {
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
+        let _lock = self
+            .archive_lock(&tenant_id, &req.archive_id)
+            .lock_owned()
+            .await;
+        tracing::info!(tenant_id = %tenant_id, archive_id = %req.archive_id, from = %req.from, to = %req.to, "crud_mv");
 
         tokio::task::spawn_blocking(move || -> arx_core::error::Result<()> {
             let mut arc = CrudArchive::open_with_crypto(&archive_path, aead_key, [0u8; 32])?;
@@ -542,11 +589,14 @@ impl ArxService for ArxServiceImpl {
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
         let prefix = req.prefix.clone();
+        let offset = req.offset as usize;
+        let limit = req.limit as usize;
 
-        let entries =
-            tokio::task::spawn_blocking(move || -> arx_core::error::Result<Vec<CrudLsEntry>> {
+        let (entries, total_count) = tokio::task::spawn_blocking(
+            move || -> arx_core::error::Result<(Vec<CrudLsEntry>, u32)> {
                 let arc = CrudArchive::open_with_crypto(&archive_path, aead_key, [0u8; 32])?;
-                Ok(arc
+                // BTreeMap iterates in sorted path order already
+                let all: Vec<CrudLsEntry> = arc
                     .index
                     .by_path
                     .iter()
@@ -556,16 +606,31 @@ impl ArxService for ArxServiceImpl {
                         size: e.size,
                         mtime: e.mtime,
                     })
-                    .collect())
-            })
-            .await
-            .map_err(|e| Status::internal(e.to_string()))?
-            .map_err(arx_err)?;
+                    .collect();
+                let total = all.len() as u32;
+                let page = if limit == 0 {
+                    all
+                } else {
+                    all.into_iter().skip(offset).take(limit).collect()
+                };
+                Ok((page, total))
+            },
+        )
+        .await
+        .map_err(|e| Status::internal(e.to_string()))?
+        .map_err(arx_err)?;
 
-        Ok(Response::new(CrudLsResponse { entries }))
+        Ok(Response::new(CrudLsResponse {
+            entries,
+            total_count,
+        }))
     }
 
     // ── CrudSync ─────────────────────────────────────────────────────────────
+    //
+    // Compact the crud overlay in-place: the archive keeps the same ID.
+    // The compacted data is written to `<data.arx>.tmp`, atomically renamed
+    // over `data.arx`, and the journal/delta sidecars are cleared.
     async fn crud_sync(
         &self,
         request: Request<CrudSyncRequest>,
@@ -577,32 +642,50 @@ impl ArxService for ArxServiceImpl {
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
+        let _lock = self
+            .archive_lock(&tenant_id, &req.archive_id)
+            .lock_owned()
+            .await;
+        tracing::info!(tenant_id = %tenant_id, archive_id = %req.archive_id, "crud_sync");
+        let paths = self.store.archive_paths(&tenant_id, &req.archive_id);
 
-        // New archive for the compacted result
-        let new_id = self
-            .store
-            .new_archive(&tenant_id, "synced")
-            .map_err(|e| Status::internal(e.to_string()))?;
-        let new_paths = self.store.archive_paths(&tenant_id, &new_id);
-        let new_out = new_paths.data.clone();
+        let tmp_out = paths.data.with_extension("arx.tmp");
+        let archive_path_c = archive_path.clone();
+        let tmp_out_c = tmp_out.clone();
+        let journal_c = paths.journal.clone();
+        let delta_c = paths.delta.clone();
+        let seal_base = req.seal_base;
 
-        tokio::task::spawn_blocking(move || {
+        tokio::task::spawn_blocking(move || -> arx_core::error::Result<()> {
             CrudArchive::sync_to_base(
-                &archive_path,
-                Some(&new_out),
+                &archive_path_c,
+                Some(&tmp_out_c),
                 false,
                 0.05,
                 aead_key,
                 [0u8; 32],
-                req.seal_base,
-            )
+                seal_base,
+            )?;
+            std::fs::rename(&tmp_out_c, &archive_path_c)?;
+            // Sync has committed everything into the new base — drop the overlay.
+            let _ = std::fs::remove_file(&journal_c);
+            let _ = std::fs::remove_file(&delta_c);
+            Ok(())
         })
         .await
         .map_err(|e| Status::internal(e.to_string()))?
         .map_err(arx_err)?;
 
+        let stats = arx_core::read::stats::compute_stats(&archive_path, aead_key).ok();
+        let size_bytes = stats
+            .as_ref()
+            .map(|s| s.physical_bytes_base + s.physical_bytes_delta)
+            .unwrap_or(0);
+
         Ok(Response::new(CrudSyncResponse {
-            new_archive_id: new_id,
+            ok: true,
+            size_bytes,
+            stats: stats.map(crate::store::into_proto_stats),
             error: String::new(),
         }))
     }
@@ -697,6 +780,34 @@ impl ArxService for ArxServiceImpl {
         let req = request.into_inner();
         self.store.delete_archive(&tenant_id, &req.archive_id)?;
         Ok(Response::new(DeleteArchiveResp {
+            ok: true,
+            error: String::new(),
+        }))
+    }
+
+    // ── RenameArchive ────────────────────────────────────────────────────────
+    async fn rename_archive(
+        &self,
+        request: Request<RenameArchiveRequest>,
+    ) -> Result<Response<RenameArchiveResponse>, Status> {
+        let tenant_id = {
+            let _t = extract_bearer(&request)?;
+            extract_tenant(&_t, &self.db).await?
+        };
+        let req = request.into_inner();
+        let name = req.name.trim();
+        if name.is_empty() || name.len() > 128 {
+            return Ok(Response::new(RenameArchiveResponse {
+                ok: false,
+                error: "name must be 1..=128 chars".to_string(),
+            }));
+        }
+        // Ownership check (also rejects path traversal).
+        self.store.resolve(&tenant_id, &req.archive_id)?;
+        self.store
+            .write_label(&tenant_id, &req.archive_id, name)
+            .map_err(|e| Status::internal(e.to_string()))?;
+        Ok(Response::new(RenameArchiveResponse {
             ok: true,
             error: String::new(),
         }))

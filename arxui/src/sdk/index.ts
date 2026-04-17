@@ -6,7 +6,7 @@ import { FileService } from "./file-service";
 
 export type { TokenStore } from "./token-store";
 export type { LoginResult, WhoamiResult } from "./auth-service";
-export type { Vault, CreateVaultOpts, VerifyResult } from "./vault-service";
+export type { Vault, VaultStats, CreateVaultOpts, VerifyResult } from "./vault-service";
 export type { FileEntry, ProgressItem, DiffEntry, UploadFile } from "./file-service";
 
 export interface ArxClientOpts {
@@ -22,11 +22,26 @@ export class ArxClient {
   readonly auth: AuthService;
   readonly vaults: VaultService;
   readonly files: FileService;
+  readonly baseUrl: string;
+  private readonly tokenStore: TokenStore;
 
-  private constructor(auth: AuthService, vaults: VaultService, files: FileService) {
+  private constructor(
+    auth: AuthService,
+    vaults: VaultService,
+    files: FileService,
+    baseUrl: string,
+    tokenStore: TokenStore,
+  ) {
     this.auth = auth;
     this.vaults = vaults;
     this.files = files;
+    this.baseUrl = baseUrl;
+    this.tokenStore = tokenStore;
+  }
+
+  /** Read the current access token from the underlying store (for non-gRPC HTTP calls). */
+  getAccessToken(): string | null {
+    return this.tokenStore.getAccessToken();
   }
 
   static create(opts: ArxClientOpts): ArxClient {
@@ -42,7 +57,9 @@ export class ArxClient {
     return new ArxClient(
       new AuthService(transport, store),
       new VaultService(transport),
-      new FileService(transport),
+      new FileService(transport, opts.baseUrl, () => store.getAccessToken()),
+      opts.baseUrl,
+      store,
     );
   }
 }

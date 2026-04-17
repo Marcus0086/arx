@@ -115,6 +115,10 @@ pub struct ArchiveStats {
     pub logical_bytes: u64,
     #[prost(uint64, tag = "5")]
     pub stored_bytes: u64,
+    #[prost(float, tag = "6")]
+    pub compression_ratio: f32,
+    #[prost(uint64, tag = "7")]
+    pub savings_bytes: u64,
 }
 
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -259,6 +263,10 @@ pub struct CrudLsRequest {
     pub long_format: bool,
     #[prost(message, optional, tag = "4")]
     pub key: Option<KeyMaterial>,
+    #[prost(uint32, tag = "5")]
+    pub offset: u32,
+    #[prost(uint32, tag = "6")]
+    pub limit: u32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CrudLsEntry {
@@ -273,6 +281,8 @@ pub struct CrudLsEntry {
 pub struct CrudLsResponse {
     #[prost(message, repeated, tag = "1")]
     pub entries: Vec<CrudLsEntry>,
+    #[prost(uint32, tag = "2")]
+    pub total_count: u32,
 }
 
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -286,9 +296,13 @@ pub struct CrudSyncRequest {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CrudSyncResponse {
-    #[prost(string, tag = "1")]
-    pub new_archive_id: String,
-    #[prost(string, tag = "2")]
+    #[prost(bool, tag = "1")]
+    pub ok: bool,
+    #[prost(uint64, tag = "2")]
+    pub size_bytes: u64,
+    #[prost(message, optional, tag = "3")]
+    pub stats: Option<ArchiveStats>,
+    #[prost(string, tag = "4")]
     pub error: String,
 }
 
@@ -354,6 +368,8 @@ pub struct ArchiveInfo {
     pub created_at: String,
     #[prost(bool, tag = "5")]
     pub encrypted: bool,
+    #[prost(message, optional, tag = "6")]
+    pub stats: Option<ArchiveStats>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ListArchivesReq {}
@@ -361,6 +377,21 @@ pub struct ListArchivesReq {}
 pub struct ListArchivesResp {
     #[prost(message, repeated, tag = "1")]
     pub archives: Vec<ArchiveInfo>,
+}
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RenameArchiveRequest {
+    #[prost(string, tag = "1")]
+    pub archive_id: String,
+    #[prost(string, tag = "2")]
+    pub name: String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RenameArchiveResponse {
+    #[prost(bool, tag = "1")]
+    pub ok: bool,
+    #[prost(string, tag = "2")]
+    pub error: String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DeleteArchiveReq {
@@ -618,6 +649,11 @@ pub trait ArxService: Send + Sync + 'static {
         request: tonic::Request<DeleteArchiveReq>,
     ) -> std::result::Result<tonic::Response<DeleteArchiveResp>, tonic::Status>;
 
+    async fn rename_archive(
+        &self,
+        request: tonic::Request<RenameArchiveRequest>,
+    ) -> std::result::Result<tonic::Response<RenameArchiveResponse>, tonic::Status>;
+
     // ── Auth RPCs ──────────────────────────────────────────────────────────────
     async fn login(
         &self,
@@ -815,6 +851,9 @@ where
             }
             "/arx.ArxService/DeleteArchive" => {
                 unary_handler!(DeleteArchiveReq, DeleteArchiveResp, delete_archive)
+            }
+            "/arx.ArxService/RenameArchive" => {
+                unary_handler!(RenameArchiveRequest, RenameArchiveResponse, rename_archive)
             }
             "/arx.ArxService/Login" => unary_handler!(LoginRequest, LoginResponse, login),
             "/arx.ArxService/RefreshToken" => {

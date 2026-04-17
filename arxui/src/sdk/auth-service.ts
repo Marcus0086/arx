@@ -34,7 +34,7 @@ export class AuthService {
     this.store.setRefreshToken(res.refreshToken);
     // Set presence cookie so middleware can check auth server-side
     if (typeof document !== "undefined") {
-      document.cookie = `arx_session=1; path=/; SameSite=Lax`;
+      document.cookie = `arx_session=1; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
     }
     this.notify(true);
     return {
@@ -83,7 +83,7 @@ export class AuthService {
       this.store.setAccessToken(res.accessToken);
       this.store.setRefreshToken(res.newRefreshToken);
       if (typeof document !== "undefined") {
-        document.cookie = `arx_session=1; path=/; SameSite=Lax`;
+        document.cookie = `arx_session=1; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
       }
       return this.whoami();
     } catch {

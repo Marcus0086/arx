@@ -1,7 +1,23 @@
+use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
+
+/// Map arx-core's in-memory Stats to the proto ArchiveStats message.
+pub fn into_proto_stats(s: arx_core::stats::Stats) -> crate::arx::ArchiveStats {
+    let stored = s.physical_bytes_base + s.physical_bytes_delta;
+    let savings = s.logical_bytes.saturating_sub(stored);
+    crate::arx::ArchiveStats {
+        files: s.files,
+        dirs: s.dirs,
+        chunks: s.chunks,
+        logical_bytes: s.logical_bytes,
+        stored_bytes: stored,
+        compression_ratio: s.compression_ratio,
+        savings_bytes: savings,
+    }
+}
 
 /// Resolved file paths for a single archive.
 pub struct ArchivePaths {
@@ -9,6 +25,19 @@ pub struct ArchivePaths {
     pub data: PathBuf,    // data.arx
     pub journal: PathBuf, // data.arx.log
     pub delta: PathBuf,   // data.arx.delta
+    pub meta: PathBuf,    // meta.json (sidecar for mutable metadata)
+}
+
+/// Mutable per-archive metadata stored in meta.json alongside data.arx.
+/// The CBOR manifest inside data.arx is sealed at pack time and can't be
+/// updated without rewriting the whole archive, so mutable fields like the
+/// user-facing label live here.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct ArchiveMeta {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub updated_at: u64,
 }
 
 /// Manages the on-disk storage layout for all tenants.
@@ -48,8 +77,45 @@ impl ArchiveStore {
             data: dir.join("data.arx"),
             journal: dir.join("data.arx.log"),
             delta: dir.join("data.arx.delta"),
+            meta: dir.join("meta.json"),
             dir,
         }
+    }
+
+    /// Read the mutable metadata sidecar for an archive. Returns None if no
+    /// sidecar exists or it fails to parse.
+    pub fn read_meta(&self, tenant_id: &str, archive_id: &str) -> Option<ArchiveMeta> {
+        let path = self.archive_paths(tenant_id, archive_id).meta;
+        let bytes = fs::read(&path).ok()?;
+        serde_json::from_slice::<ArchiveMeta>(&bytes).ok()
+    }
+
+    /// Read just the user-facing label from the meta sidecar.
+    pub fn read_label(&self, tenant_id: &str, archive_id: &str) -> Option<String> {
+        self.read_meta(tenant_id, archive_id).and_then(|m| m.label)
+    }
+
+    /// Write the user-facing label to the meta sidecar. Creates the file if
+    /// missing; preserves other fields if present.
+    pub fn write_label(
+        &self,
+        tenant_id: &str,
+        archive_id: &str,
+        label: &str,
+    ) -> std::io::Result<()> {
+        let mut meta = self.read_meta(tenant_id, archive_id).unwrap_or_default();
+        meta.label = Some(label.to_string());
+        meta.updated_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let path = self.archive_paths(tenant_id, archive_id).meta;
+        let tmp = path.with_extension("json.tmp");
+        let json = serde_json::to_vec_pretty(&meta)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        fs::write(&tmp, &json)?;
+        fs::rename(&tmp, &path)?;
+        Ok(())
     }
 
     /// Allocate a new archive directory and return its UUID.
@@ -76,7 +142,9 @@ impl ArchiveStore {
         Ok(paths.data)
     }
 
-    /// List all archives for a tenant.
+    /// List all archives for a tenant, computing stats + resolving labels from
+    /// the meta.json sidecar (falling back to the manifest label, then to a UUID
+    /// prefix).
     pub fn list_archives(&self, tenant_id: &str) -> Vec<crate::arx::ArchiveInfo> {
         let archives_dir = self.archives_dir(tenant_id);
         let Ok(entries) = fs::read_dir(&archives_dir) else {
@@ -92,7 +160,7 @@ impl ArchiveStore {
                 if !data_path.exists() {
                     return None;
                 }
-                let size = fs::metadata(&data_path).map(|m| m.len()).unwrap_or(0);
+
                 let created_at = fs::metadata(&data_path)
                     .and_then(|m| m.created())
                     .unwrap_or(SystemTime::UNIX_EPOCH)
@@ -100,12 +168,35 @@ impl ArchiveStore {
                     .map(|d| d.as_secs().to_string())
                     .unwrap_or_default();
 
+                // Stats (cheap: reads superblock + manifest, not data chunks).
+                let stats = arx_core::read::stats::compute_stats(&data_path, None).ok();
+                let encrypted =
+                    arx_core::read::stats::read_encrypted_flag(&data_path).unwrap_or(false);
+
+                // Label resolution: meta.json > manifest meta.label > UUID prefix.
+                let name = self
+                    .read_label(tenant_id, &archive_id)
+                    .or_else(|| {
+                        if !encrypted {
+                            arx_core::read::stats::read_manifest_label(&data_path, None)
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or_else(|| archive_id.chars().take(8).collect::<String>());
+
+                let size_bytes = stats
+                    .as_ref()
+                    .map(|s| s.physical_bytes_base + s.physical_bytes_delta)
+                    .unwrap_or_else(|| fs::metadata(&data_path).map(|m| m.len()).unwrap_or(0));
+
                 Some(crate::arx::ArchiveInfo {
-                    id: archive_id.clone(),
-                    name: archive_id,
-                    size_bytes: size,
+                    id: archive_id,
+                    name,
+                    size_bytes,
                     created_at,
-                    encrypted: false, // TODO: read flag from superblock
+                    encrypted,
+                    stats: stats.map(into_proto_stats),
                 })
             })
             .collect()

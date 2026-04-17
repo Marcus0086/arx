@@ -1,8 +1,7 @@
 import { createClient } from "@connectrpc/connect";
-import type { PartialMessage } from "@bufbuild/protobuf";
 import { ArxService } from "@/src/gen/arx_connect";
-import type { UploadFrame } from "@/src/gen/arx_pb";
 import type { Transport } from "@connectrpc/connect";
+import { mapStats, type VaultStats } from "./vault-service";
 
 export interface FileEntry {
   path: string;
@@ -27,103 +26,98 @@ export interface UploadFile {
   file: File; // browser File object
 }
 
-const CHUNK_SIZE = 512 * 1024; // 512 KB — matches server frame limit
-
 export class FileService {
   private client: ReturnType<typeof createClient<typeof ArxService>>;
 
-  constructor(transport: Transport) {
+  constructor(
+    transport: Transport,
+    private baseUrl: string,
+    private getToken: () => string | null,
+  ) {
     this.client = createClient(ArxService, transport);
   }
 
-  async list(vaultId: string, prefix = ""): Promise<FileEntry[]> {
+  async list(
+    vaultId: string,
+    opts?: { prefix?: string; offset?: number; limit?: number },
+  ): Promise<{ entries: FileEntry[]; total: number }> {
     const res = await this.client.crudLs({
       archiveId: vaultId,
-      prefix,
+      prefix: opts?.prefix ?? "",
       longFormat: true,
+      offset: opts?.offset ?? 0,
+      limit: opts?.limit ?? 0,
     });
-    return res.entries.map((e) => ({
-      path: e.path,
-      size: e.size,
-      mtime: e.mtime,
-    }));
+    return {
+      entries: res.entries.map((e) => ({
+        path: e.path,
+        size: e.size,
+        mtime: e.mtime,
+      })),
+      total: res.totalCount,
+    };
   }
 
   /**
-   * Upload multiple files into a vault using the CrudAddStream RPC.
-   * Streams each file in 512 KB chunks and fires onProgress callbacks.
+   * Upload multiple files into a vault via HTTP multipart.
+   *
+   * grpc-web over HTTP/1.1 does not support client streaming (Fetch API
+   * can't stream request bodies), so uploads go through a dedicated
+   * axum endpoint `POST /api/upload/{vaultId}` on the same port.
    */
   async upload(
     vaultId: string,
     files: UploadFile[],
     opts?: { onProgress?: (item: ProgressItem) => void },
   ): Promise<void> {
-    // connect-web client-streaming: collect all frames then call once
-    // Since connect-web doesn't support true client-streaming in browsers
-    // (HTTP/1.1 doesn't support bidirectional streaming), we use PackStream
-    // which accepts a sequence of UploadFrames.
-    //
-    // We buffer each file's content and send as a single call per vault.
     for (const uf of files) {
-      await this._uploadOne(vaultId, uf, opts?.onProgress);
+      await this.uploadSingle(vaultId, uf, opts?.onProgress);
     }
   }
 
-  private async _uploadOne(
+  uploadSingle(
     vaultId: string,
     uf: UploadFile,
     onProgress?: (item: ProgressItem) => void,
   ): Promise<void> {
-    const buffer = await uf.file.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
+    return new Promise((resolve, reject) => {
+      const form = new FormData();
+      form.append(uf.name, uf.file, uf.name);
 
-    const self = this;
-    // Build an async generator of PartialMessage<UploadFrame> frames
-    async function* frameStream(): AsyncIterable<PartialMessage<UploadFrame>> {
-      // Frame 1: CrudHeader
-      yield { payload: { case: "crudHeader", value: { archiveId: vaultId } } };
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${this.baseUrl}/api/upload/${encodeURIComponent(vaultId)}`);
 
-      // Frame 2: FileInfo
-      yield {
-        payload: {
-          case: "fileInfo",
-          value: {
-            path: uf.name,
-            mode: 0o644,
-            mtime: BigInt(Math.floor(uf.file.lastModified / 1000)),
-            size: BigInt(uf.file.size),
-          },
-        },
+      const token = this.getToken();
+      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          onProgress?.({
+            fileName: uf.name,
+            bytesUploaded: e.loaded,
+            totalBytes: e.total,
+            done: false,
+          });
+        }
       };
 
-      // Data frames (512 KB chunks)
-      let offset = 0;
-      while (offset < bytes.length) {
-        const chunk = bytes.slice(offset, offset + CHUNK_SIZE);
-        yield { payload: { case: "data", value: chunk } };
-        offset += chunk.length;
-        onProgress?.({
-          fileName: uf.name,
-          bytesUploaded: Math.min(offset, bytes.length),
-          totalBytes: bytes.length,
-          done: false,
-        });
-        // Yield control back to allow progress UI updates
-        await new Promise<void>((r) => setTimeout(r, 0));
-      }
+      xhr.onload = () => {
+        if (xhr.status < 400) {
+          onProgress?.({
+            fileName: uf.name,
+            bytesUploaded: uf.file.size,
+            totalBytes: uf.file.size,
+            done: true,
+          });
+          resolve();
+        } else {
+          reject(new Error(xhr.responseText || `Upload failed (${xhr.status})`));
+        }
+      };
+      xhr.onerror = () => reject(new Error("Upload failed (network error)"));
+      xhr.onabort = () => reject(new Error("Upload aborted"));
 
-      // Finalize
-      yield { payload: { case: "finalize", value: true } };
-    }
-
-    void self; // suppress unused warning
-    await this.client.crudAddStream(frameStream());
-
-    onProgress?.({
-      fileName: uf.name,
-      bytesUploaded: bytes.length,
-      totalBytes: bytes.length,
-      done: true,
+      xhr.send(form);
     });
   }
 
@@ -167,10 +161,55 @@ export class FileService {
     if (!res.ok) throw new Error(res.error || "Rename failed");
   }
 
-  async sync(vaultId: string): Promise<{ newVaultId: string }> {
+  async sync(
+    vaultId: string,
+  ): Promise<{ ok: boolean; sizeBytes: bigint; stats?: VaultStats }> {
     const res = await this.client.crudSync({ archiveId: vaultId, sealBase: false });
     if (res.error) throw new Error(res.error);
-    return { newVaultId: res.newArchiveId };
+    return {
+      ok: res.ok,
+      sizeBytes: res.sizeBytes,
+      stats: res.stats ? mapStats(res.stats) : undefined,
+    };
+  }
+
+  /**
+   * Stream the first `maxBytes` of a file for preview — used for text previews
+   * without downloading the whole file. Returns the bytes + a `truncated` flag.
+   */
+  async preview(
+    vaultId: string,
+    path: string,
+    maxBytes: number,
+  ): Promise<{ bytes: Uint8Array; truncated: boolean; totalSize: number }> {
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    let truncated = false;
+    for await (const frame of this.client.extractStream({
+      archiveId: vaultId,
+      path,
+      start: 0n,
+      len: BigInt(maxBytes),
+    })) {
+      if (frame.payload.case === "data") {
+        const bytes = frame.payload.value;
+        chunks.push(bytes);
+        total += bytes.length;
+        if (total >= maxBytes) {
+          truncated = true;
+          break;
+        }
+      } else if (frame.payload.case === "error") {
+        throw new Error(frame.payload.value);
+      }
+    }
+    const out = new Uint8Array(total);
+    let o = 0;
+    for (const c of chunks) {
+      out.set(c, o);
+      o += c.length;
+    }
+    return { bytes: out, truncated, totalSize: total };
   }
 
   async diff(vaultId: string): Promise<DiffEntry[]> {

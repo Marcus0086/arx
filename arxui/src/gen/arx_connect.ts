@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { ChunkMapRequest, ChunkMapResponse, CreateApiKeyRequest, CreateApiKeyResponse, CreateTenantRequest, CreateTenantResponse, CreateUserRequest, CreateUserResponse, CrudAddResponse, CrudDiffRequest, CrudDiffResponse, CrudLsRequest, CrudLsResponse, CrudMvRequest, CrudMvResponse, CrudRmRequest, CrudRmResponse, CrudSyncRequest, CrudSyncResponse, DeleteArchiveReq, DeleteArchiveResp, DownloadFrame, ExtractRequest, IssueRequest, IssueResponse, ListArchivesReq, ListArchivesResp, ListRequest, ListResponse, ListTenantsRequest, ListTenantsResponse, ListUsersRequest, ListUsersResponse, LoginRequest, LoginResponse, LogoutRequest, LogoutResponse, PackResponse, RefreshTokenRequest, RefreshTokenResponse, RevokeApiKeyRequest, RevokeApiKeyResponse, UploadFrame, VerifyRequest, VerifyResponse, WhoamiRequest, WhoamiResponse } from "./arx_pb";
+import { ChunkMapRequest, ChunkMapResponse, CreateApiKeyRequest, CreateApiKeyResponse, CreateTenantRequest, CreateTenantResponse, CreateUserRequest, CreateUserResponse, CrudAddResponse, CrudDiffRequest, CrudDiffResponse, CrudLsRequest, CrudLsResponse, CrudMvRequest, CrudMvResponse, CrudRmRequest, CrudRmResponse, CrudSyncRequest, CrudSyncResponse, DeleteArchiveReq, DeleteArchiveResp, DownloadFrame, ExtractRequest, IssueRequest, IssueResponse, ListArchivesReq, ListArchivesResp, ListRequest, ListResponse, ListTenantsRequest, ListTenantsResponse, ListUsersRequest, ListUsersResponse, LoginRequest, LoginResponse, LogoutRequest, LogoutResponse, PackResponse, RefreshTokenRequest, RefreshTokenResponse, RenameArchiveRequest, RenameArchiveResponse, RevokeApiKeyRequest, RevokeApiKeyResponse, UploadFrame, VerifyRequest, VerifyResponse, WhoamiRequest, WhoamiResponse } from "./arx_pb";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -148,6 +148,15 @@ export const ArxService = {
       name: "DeleteArchive",
       I: DeleteArchiveReq,
       O: DeleteArchiveResp,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc arx.ArxService.RenameArchive
+     */
+    renameArchive: {
+      name: "RenameArchive",
+      I: RenameArchiveRequest,
+      O: RenameArchiveResponse,
       kind: MethodKind.Unary,
     },
     /**

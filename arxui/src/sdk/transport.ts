@@ -53,11 +53,15 @@ async function doRefresh(
     onFailed();
     throw new Error("No refresh token");
   }
-  // Use a bare transport (no interceptor) to avoid recursion
+  // Use a bare transport (no interceptor) to avoid recursion.
+  // Race against a 15-second timeout so a hung server doesn't freeze all requests.
   const bare = createGrpcWebTransport({ baseUrl });
   const client = createClient(ArxService, bare);
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("Token refresh timed out")), 15_000),
+  );
   try {
-    const res = await client.refreshToken({ refreshToken });
+    const res = await Promise.race([client.refreshToken({ refreshToken }), timeout]);
     store.setAccessToken(res.accessToken);
     store.setRefreshToken(res.newRefreshToken);
     return res.accessToken;

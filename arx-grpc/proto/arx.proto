@@ -66,11 +66,13 @@ message DownloadFrame {
 
 // ── Archive statistics ────────────────────────────────────────────────────────
 message ArchiveStats {
-  uint64 files         = 1;
-  uint64 dirs          = 2;
-  uint64 chunks        = 3;
-  uint64 logical_bytes = 4;
-  uint64 stored_bytes  = 5;
+  uint64 files             = 1;
+  uint64 dirs              = 2;
+  uint64 chunks            = 3;
+  uint64 logical_bytes     = 4;
+  uint64 stored_bytes      = 5;
+  float  compression_ratio = 6;   // stored / logical (0..1 when compressed)
+  uint64 savings_bytes     = 7;   // logical - stored
 }
 
 // ── Pack ──────────────────────────────────────────────────────────────────────
@@ -128,12 +130,17 @@ message CrudRmResponse   { bool ok = 1; string error = 2; }
 message CrudMvRequest    { string archive_id = 1; string from = 2; string to = 3; KeyMaterial key = 4; }
 message CrudMvResponse   { bool ok = 1; string error = 2; }
 
-message CrudLsRequest    { string archive_id = 1; string prefix = 2; bool long_format = 3; KeyMaterial key = 4; }
+message CrudLsRequest    { string archive_id = 1; string prefix = 2; bool long_format = 3; KeyMaterial key = 4; uint32 offset = 5; uint32 limit = 6; }
 message CrudLsEntry      { string path = 1; uint64 size = 2; uint64 mtime = 3; }
-message CrudLsResponse   { repeated CrudLsEntry entries = 1; }
+message CrudLsResponse   { repeated CrudLsEntry entries = 1; uint32 total_count = 2; }
 
 message CrudSyncRequest  { string archive_id = 1; bool seal_base = 2; KeyMaterial key = 3; }
-message CrudSyncResponse { string new_archive_id = 1; string error = 2; }
+message CrudSyncResponse {
+  bool         ok         = 1;
+  uint64       size_bytes = 2;
+  ArchiveStats stats      = 3;
+  string       error      = 4;
+}
 
 message CrudDiffEntry    { string kind = 1; string path = 2; }
 message CrudDiffRequest  { string archive_id = 1; KeyMaterial key = 2; }
@@ -145,9 +152,21 @@ message ChunkMapEntry    { uint64 ordinal = 1; uint64 id = 2; uint32 codec = 3; 
 message ChunkMapResponse { repeated ChunkMapEntry entries = 1; }
 
 // ── Archive management ────────────────────────────────────────────────────────
-message ArchiveInfo       { string id = 1; string name = 2; uint64 size_bytes = 3; string created_at = 4; bool encrypted = 5; }
+message ArchiveInfo {
+  string       id         = 1;
+  string       name       = 2;
+  uint64       size_bytes = 3;
+  string       created_at = 4;
+  bool         encrypted  = 5;
+  ArchiveStats stats      = 6;
+}
 message ListArchivesReq   {}
 message ListArchivesResp  { repeated ArchiveInfo archives = 1; }
+
+// Rename an existing archive. Stored in a per-archive meta.json sidecar; does
+// not mutate the (immutable) archive manifest.
+message RenameArchiveRequest  { string archive_id = 1; string name = 2; }
+message RenameArchiveResponse { bool ok = 1; string error = 2; }
 message DeleteArchiveReq  { string archive_id = 1; }
 message DeleteArchiveResp { bool ok = 1; string error = 2; }
 
@@ -202,6 +221,7 @@ service ArxService {
   // Archive management
   rpc ListArchives(ListArchivesReq)     returns (ListArchivesResp);
   rpc DeleteArchive(DeleteArchiveReq)   returns (DeleteArchiveResp);
+  rpc RenameArchive(RenameArchiveRequest) returns (RenameArchiveResponse);
 
   // Auth — no prior credentials required
   rpc Login(LoginRequest)               returns (LoginResponse);

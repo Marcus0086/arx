@@ -2,13 +2,11 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { useSdk } from "@/src/lib/sdk-context";
 import { useAuthStore } from "@/src/stores/auth-store";
-import { AppSidebar } from "./app-sidebar";
-import { UploadQueuePanel } from "./upload-queue";
-import { Loader2 } from "lucide-react";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AuthGuard({ children }: { children: React.ReactNode }) {
   const sdk = useSdk();
   const { user, hydrated, setUser, setHydrated } = useAuthStore();
   const router = useRouter();
@@ -25,18 +23,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!hydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
-
   if (!user) return null;
-
-  return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <AppSidebar user={user} />
-      <main className="flex-1 overflow-auto">{children}</main>
-      <UploadQueuePanel />
-    </div>
-  );
+  return <>{children}</>;
 }
