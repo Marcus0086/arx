@@ -132,7 +132,7 @@ export default function VaultDetailPage({ params }: Props) {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Rename failed"),
   });
 
-  const UPLOAD_CONCURRENCY = 3;
+  const UPLOAD_CONCURRENCY = 20;
 
   async function handleUpload(browserFiles: File[]) {
     setUploading(true);
