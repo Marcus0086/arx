@@ -1,8 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { useSdk } from "@/src/lib/sdk-context";
 import {
   ContextMenu,
@@ -30,13 +28,6 @@ interface FileGridProps {
   onDelete: (path: string) => void;
 }
 
-function getColCount(width: number): number {
-  if (width < 640) return 2;
-  if (width < 768) return 3;
-  if (width < 1024) return 4;
-  return 5;
-}
-
 export function FileGrid({
   vaultId,
   files,
@@ -44,77 +35,18 @@ export function FileGrid({
   onDownload,
   onDelete,
 }: FileGridProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) =>
-      setContainerWidth(entry.contentRect.width),
-    );
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const colCount = containerWidth > 0 ? getColCount(containerWidth) : 5;
-  const rowHeight = containerWidth > 0 ? Math.floor(containerWidth / colCount) + 44 : 204;
-
-  // Chunk files into rows
-  const rows: FileEntry[][] = [];
-  for (let i = 0; i < files.length; i += colCount) {
-    rows.push(files.slice(i, i + colCount));
-  }
-
-  const estimateSize = useCallback(() => rowHeight, [rowHeight]);
-
-  const virtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => containerRef.current,
-    estimateSize,
-    overscan: 3,
-  });
-
   return (
-    <div
-      ref={containerRef}
-      style={{
-        height: "calc(100vh - 320px)",
-        minHeight: 300,
-        overflow: "auto",
-        position: "relative",
-      }}
-    >
-      <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
-        {virtualizer.getVirtualItems().map((vRow) => (
-          <div
-            key={vRow.index}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: vRow.size,
-              transform: `translateY(${vRow.start}px)`,
-              display: "grid",
-              gridTemplateColumns: `repeat(${colCount}, 1fr)`,
-              gap: "1rem",
-              alignItems: "start",
-            }}
-          >
-            {rows[vRow.index].map((file) => (
-              <FileItem
-                key={file.path}
-                vaultId={vaultId}
-                file={file}
-                onPreview={() => onPreview(file)}
-                onDownload={() => onDownload(file.path)}
-                onDelete={() => onDelete(file.path)}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+      {files.map((file) => (
+        <FileItem
+          key={file.path}
+          vaultId={vaultId}
+          file={file}
+          onPreview={() => onPreview(file)}
+          onDownload={() => onDownload(file.path)}
+          onDelete={() => onDelete(file.path)}
+        />
+      ))}
     </div>
   );
 }
@@ -140,17 +72,15 @@ function FileItem({ vaultId, file, onPreview, onDownload, onDelete }: FileItemPr
   const ext = getExt(file.path);
   const isImage = IMAGE_EXTS.has(ext);
   const isVideo = VIDEO_EXTS.has(ext);
-
   const sdk = useSdk();
 
-  // Lazy-load thumbnail for images
   const { data: previewUrl } = useQuery({
     queryKey: ["preview", vaultId, file.path],
     queryFn: async () => {
       const blob = await sdk.files.download(vaultId, file.path);
       return URL.createObjectURL(blob);
     },
-    enabled: isImage && Number(file.size) < 8 * 1024 * 1024, // only for files < 8 MB
+    enabled: isImage && Number(file.size) < 8 * 1024 * 1024,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
@@ -177,7 +107,6 @@ function FileItem({ vaultId, file, onPreview, onDownload, onDelete }: FileItemPr
             <Trash2 className="size-3" />
           </button>
 
-          {/* Thumbnail or icon */}
           <div className="aspect-square rounded overflow-hidden flex items-center justify-center bg-card">
             {isImage && previewUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -199,7 +128,6 @@ function FileItem({ vaultId, file, onPreview, onDownload, onDelete }: FileItemPr
             )}
           </div>
 
-          {/* Name & size */}
           <div className="flex flex-col gap-0.5 min-w-0 px-1 pb-0.5">
             <p className="text-xs truncate leading-tight">{name}</p>
             <p className="text-[10px] uppercase text-muted-foreground tracking-wide">

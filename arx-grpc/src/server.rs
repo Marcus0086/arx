@@ -41,7 +41,10 @@ impl ArxServiceImpl {
 fn arx_err(e: ArxError) -> Status {
     match e {
         ArxError::AeadError => Status::unauthenticated("AEAD authentication failed — wrong key"),
-        ArxError::Io(_) => Status::internal("storage error"),
+        ArxError::Io(ref io) => {
+            tracing::error!(error = %io, "storage IO error");
+            Status::internal("storage error")
+        }
         ArxError::Format(msg) => Status::invalid_argument(msg),
     }
 }
