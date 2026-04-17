@@ -11,8 +11,10 @@ pub mod arx;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use http::Method;
 use tonic::transport::Server;
 use tonic_web::GrpcWebLayer;
+use tower_http::cors::{Any, CorsLayer};
 
 use arx::arx_service_server::ArxServiceServer;
 use db::AuthDb;
@@ -78,12 +80,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         db,
         admin_key: Arc::new(admin_key),
     });
+
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([Method::POST, Method::GET, Method::OPTIONS])
+        .allow_headers(Any)
+        .expose_headers(Any);
+
     Server::builder()
         .accept_http1(true) // required for grpc-web over HTTP/1.1
+        .layer(cors)
         .layer(GrpcWebLayer::new()) // enables grpc-web from browsers
         .add_service(svc)
-        .serve(addr)
+        .serve_with_shutdown(addr, shutdown_signal())
         .await?;
 
+    eprintln!("arx-grpc shutdown complete");
     Ok(())
+}
+
+async fn shutdown_signal() {
+    use tokio::signal;
+
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let sigterm = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let sigterm = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => eprintln!("arx-grpc received Ctrl+C, shutting down…"),
+        _ = sigterm => eprintln!("arx-grpc received SIGTERM, shutting down…"),
+    }
 }
