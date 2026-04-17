@@ -200,6 +200,14 @@ impl CrudArchive {
             )
         })?;
 
+        // Empty file (0 bytes) has no chunks — return an empty reader directly.
+        // Without this guard, Iterator::all() returns true vacuously for both
+        // all_base and all_delta, causing all_base to win and incorrectly
+        // delegate to the base archive (which doesn't have the file).
+        if entry.chunks.is_empty() {
+            return Ok(Box::new(Cursor::new(Vec::<u8>::new())));
+        }
+
         let all_base = entry.chunks.iter().all(|c| c.loc == Loc::Base);
         let all_delta = entry.chunks.iter().all(|c| c.loc == Loc::Delta);
 
