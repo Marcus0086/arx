@@ -106,6 +106,16 @@ impl Opened {
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
         // Chunk table
+        if sb.chunk_table_off > sb.data_off {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "chunk_table_off {} > data_off {}",
+                    sb.chunk_table_off, sb.data_off
+                ),
+            )
+            .into());
+        }
         let table_ct_len = sb.data_off - sb.chunk_table_off;
         if table_ct_len > MAX_TABLE_SIZE {
             return Err(std::io::Error::new(
