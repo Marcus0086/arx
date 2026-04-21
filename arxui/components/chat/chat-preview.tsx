@@ -1,4 +1,3 @@
-import Image from "next/image";
 import type { ChatConversation } from "@/types/chat";
 import { formatDate } from "./utils";
 import { mockChatData } from "@/data/chat-mock";
@@ -25,7 +24,7 @@ export default function ChatPreview({
       onClick={() => onOpenConversation(conversation.id)}
     >
       <div className="relative">
-        <Image
+        <img
           src={user.avatar}
           alt={user.name}
           width={96}

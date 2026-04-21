@@ -1,7 +1,5 @@
-"use client";
-
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useSdk } from "@/src/lib/sdk-context";
 import { useAuthStore } from "@/src/stores/auth-store";
@@ -9,16 +7,16 @@ import { useAuthStore } from "@/src/stores/auth-store";
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const sdk = useSdk();
   const { user, hydrated, setUser, setHydrated } = useAuthStore();
-  const router = useRouter();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (hydrated) return;
     sdk.auth.hydrate().then((u) => {
       setUser(u);
       setHydrated();
-      if (!u) router.replace("/login");
+      if (!u) navigate("/login", { replace: true });
     });
-  }, [hydrated, sdk, setUser, setHydrated, router]);
+  }, [hydrated, sdk, setUser, setHydrated, navigate]);
 
   if (!hydrated) {
     return (

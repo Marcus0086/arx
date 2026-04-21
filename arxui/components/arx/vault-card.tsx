@@ -1,7 +1,5 @@
-"use client";
-
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSdk } from "@/src/lib/sdk-context";
 import { Button } from "@/components/ui/button";
@@ -30,7 +28,7 @@ function formatBytes(n: bigint | number) {
 }
 
 export function VaultCard({ vault, onDelete }: VaultCardProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const sdk = useSdk();
   const qc = useQueryClient();
 
@@ -78,7 +76,7 @@ export function VaultCard({ vault, onDelete }: VaultCardProps) {
   return (
     <div
       className="group relative flex flex-col bg-pop rounded-lg p-1.5 gap-1 cursor-pointer ring-1 ring-transparent hover:ring-border transition-all"
-      onClick={() => !editing && router.push(`/vaults/${vault.id}`)}
+      onClick={() => !editing && navigate(`/vaults/${vault.id}`)}
     >
       {/* Header: icon + menu */}
       <div className="flex items-center justify-between h-9 px-1 pr-1.5">

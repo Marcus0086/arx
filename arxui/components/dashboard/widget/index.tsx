@@ -1,11 +1,8 @@
-"use client";
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import TVNoise from "@/components/ui/tv-noise";
 import type { WidgetData } from "@/types/dashboard";
-import Image from "next/image";
 
 interface WidgetProps {
   widgetData: WidgetData;
@@ -68,7 +65,7 @@ export default function Widget({ widgetData }: WidgetProps) {
         </div>
 
         <div className="absolute inset-0 -z-[1]">
-          <Image
+          <img
             src="/assets/pc_blueprint.gif"
             alt="logo"
             width={250}

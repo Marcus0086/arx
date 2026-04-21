@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import type { ChatConversation, ChatUser } from "@/types/chat";
 import { formatDate } from "./utils";
@@ -26,7 +25,7 @@ export default function ChatContact({
       )}
 
       <div className="relative">
-        <Image
+        <img
           src={otherUser.avatar}
           alt={otherUser.name}
           width={40}

@@ -1,5 +1,3 @@
-"use client";
-
 import { createContext, useContext, useMemo } from "react";
 import { ArxClient } from "@/src/sdk";
 
@@ -17,7 +15,7 @@ export function SdkProvider({
       ArxClient.create({
         baseUrl,
         onAuthExpired: () => {
-          if (typeof window !== "undefined") window.location.href = "/login";
+          window.location.replace("/login");
         },
       }),
     [baseUrl],

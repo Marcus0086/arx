@@ -1,7 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import DashboardCard from "@/components/dashboard/card";
 import type { RebelRanking } from "@/types/dashboard";
-import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 interface RebelsRankingProps {
@@ -36,7 +35,7 @@ export default function RebelsRanking({ rebels }: RebelsRankingProps) {
                 )}
               >
                 {rebel.avatar ? (
-                  <Image
+                  <img
                     src={rebel.avatar}
                     alt={rebel.name}
                     width={120}

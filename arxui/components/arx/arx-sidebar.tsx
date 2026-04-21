@@ -1,7 +1,6 @@
-"use client";
-
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { invoke } from "@tauri-apps/api/core";
 import {
   Sidebar,
   SidebarContent,
@@ -24,8 +23,15 @@ import { useAuthStore } from "@/src/stores/auth-store";
 import { UserAvatar } from "@/components/arx/user-avatar";
 
 export function ArxSidebar() {
-  const pathname = usePathname();
-  const router = useRouter();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const [rootDir, setRootDir] = useState<string>("");
+
+  useEffect(() => {
+    invoke<string>("get_root_dir")
+      .then(setRootDir)
+      .catch(() => {});
+  }, []);
   const sdk = useSdk();
   const { user, setUser } = useAuthStore();
 
@@ -34,7 +40,7 @@ export function ArxSidebar() {
       await sdk.auth.logout();
     } finally {
       setUser(null);
-      router.replace("/login");
+      navigate("/login", { replace: true });
     }
   }
 
@@ -62,7 +68,7 @@ export function ArxSidebar() {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname.startsWith("/vaults")}>
-                  <Link href="/vaults">
+                  <Link to="/vaults">
                     <HardDrive className="size-5" />
                     <span>My Vaults</span>
                   </Link>
@@ -116,6 +122,20 @@ export function ArxSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {/* Storage location display */}
+        {rootDir && (
+          <div className="px-3 pb-2 pt-1">
+            <div
+              className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60 cursor-default"
+              title={rootDir}
+            >
+              <HardDrive className="h-3 w-3 shrink-0" />
+              <span className="truncate font-mono">
+                {rootDir.split("/").pop() || rootDir}
+              </span>
+            </div>
+          </div>
+        )}
       </SidebarFooter>
 
       <SidebarRail />

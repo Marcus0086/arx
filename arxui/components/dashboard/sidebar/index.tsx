@@ -1,5 +1,3 @@
-"use client";
-
 import * as React from "react";
 
 import {
@@ -28,7 +26,6 @@ import MonkeyIcon from "@/components/icons/monkey";
 import DotsVerticalIcon from "@/components/icons/dots-vertical";
 import { Bullet } from "@/components/ui/bullet";
 import LockIcon from "@/components/icons/lock";
-import Image from "next/image";
 import { useIsV0 } from "@/lib/v0-context";
 
 // This is sample data for the sidebar
@@ -170,7 +167,7 @@ export function DashboardSidebar({
                 <Popover>
                   <PopoverTrigger className="flex gap-0.5 w-full group cursor-pointer">
                     <div className="shrink-0 flex size-14 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground overflow-clip">
-                      <Image
+                      <img
                         src={data.user.avatar}
                         alt={data.user.name}
                         width={120}
