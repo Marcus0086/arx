@@ -8,6 +8,7 @@ import { Toaster } from "sonner";
 import { SdkProvider } from "@/src/lib/sdk-context";
 import { SetupGuard } from "@/components/arx/setup-guard";
 import { AuthGuard } from "@/components/arx/auth-guard";
+import { DashboardLayout } from "@/components/arx/dashboard-layout";
 
 import SetupRoute from "@/src/routes/setup";
 import LoginRoute from "@/src/routes/login";
@@ -30,7 +31,6 @@ export default function App() {
     invoke<string>("get_server_url")
       .then(setServerUrl)
       .catch(() => {
-        // Fallback for running outside Tauri (plain vite dev)
         setServerUrl(import.meta.env.VITE_ARX_URL ?? "http://localhost:50051");
       });
   }, []);
@@ -54,7 +54,9 @@ export default function App() {
               path="/vaults"
               element={
                 <AuthGuard>
-                  <VaultsRoute />
+                  <DashboardLayout>
+                    <VaultsRoute />
+                  </DashboardLayout>
                 </AuthGuard>
               }
             />
@@ -62,7 +64,9 @@ export default function App() {
               path="/vaults/:vaultId"
               element={
                 <AuthGuard>
-                  <VaultDetailRoute />
+                  <DashboardLayout>
+                    <VaultDetailRoute />
+                  </DashboardLayout>
                 </AuthGuard>
               }
             />
