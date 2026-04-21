@@ -7,11 +7,10 @@ import { Toaster } from "sonner";
 
 import { SdkProvider } from "@/src/lib/sdk-context";
 import { SetupGuard } from "@/components/arx/setup-guard";
-import { AuthGuard } from "@/components/arx/auth-guard";
+import { AutoAuth } from "@/components/arx/auto-auth";
 import { DashboardLayout } from "@/components/arx/dashboard-layout";
 
 import SetupRoute from "@/src/routes/setup";
-import LoginRoute from "@/src/routes/login";
 import VaultsRoute from "@/src/routes/vaults";
 import VaultDetailRoute from "@/src/routes/vault-detail";
 
@@ -49,25 +48,24 @@ export default function App() {
         <SetupGuard>
           <Routes>
             <Route path="/setup" element={<SetupRoute />} />
-            <Route path="/login" element={<LoginRoute />} />
             <Route
               path="/vaults"
               element={
-                <AuthGuard>
+                <AutoAuth>
                   <DashboardLayout>
                     <VaultsRoute />
                   </DashboardLayout>
-                </AuthGuard>
+                </AutoAuth>
               }
             />
             <Route
               path="/vaults/:vaultId"
               element={
-                <AuthGuard>
+                <AutoAuth>
                   <DashboardLayout>
                     <VaultDetailRoute />
                   </DashboardLayout>
-                </AuthGuard>
+                </AutoAuth>
               }
             />
             <Route path="*" element={<Navigate to="/vaults" replace />} />

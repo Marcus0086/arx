@@ -16,8 +16,7 @@ export function SdkProvider({
       ArxClient.create({
         baseUrl,
         onAuthExpired: () => {
-          // Reset auth state — AuthGuard will re-run and attempt auto-login
-          // with stored credentials before falling back to the login screen.
+          // Resetting hydrated triggers AutoAuth to silently re-login.
           useAuthStore.getState().reset();
         },
       }),

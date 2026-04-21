@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Sidebar,
@@ -14,40 +14,23 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Bullet } from "@/components/ui/bullet";
-import DotsVerticalIcon from "@/components/icons/dots-vertical";
-import { Archive, HardDrive, LogOut } from "lucide-react";
-import { useSdk } from "@/src/lib/sdk-context";
+import { Archive, HardDrive } from "lucide-react";
 import { useAuthStore } from "@/src/stores/auth-store";
 import { UserAvatar } from "@/components/arx/user-avatar";
 
 export function ArxSidebar() {
   const { pathname } = useLocation();
-  const navigate = useNavigate();
   const [rootDir, setRootDir] = useState<string>("");
+  const { user } = useAuthStore();
 
   useEffect(() => {
     invoke<string>("get_root_dir")
       .then(setRootDir)
       .catch(() => {});
   }, []);
-  const sdk = useSdk();
-  const { user, setUser } = useAuthStore();
 
-  const reset = useAuthStore((s) => s.reset);
-
-  async function handleLogout() {
-    try {
-      await sdk.auth.logout();
-    } finally {
-      invoke("clear_credentials").catch(() => {});
-      reset();
-      navigate("/login", { replace: true });
-    }
-  }
-
-  const shortName = user?.email?.split("@")[0]?.toUpperCase() ?? "USER";
+  const shortName = user?.email?.split("@")[0]?.toUpperCase() ?? "LOCAL";
 
   return (
     <Sidebar className="py-sides">
@@ -86,46 +69,27 @@ export function ArxSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel>
             <Bullet className="mr-2" />
-            User
+            Local User
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <Popover>
-                  <PopoverTrigger className="flex gap-0.5 w-full group cursor-pointer">
-                    <UserAvatar seed={user?.userId ?? user?.email ?? "anon"} size={56} />
-                    <div className="group/item pl-3 pr-1.5 pt-2 pb-1.5 flex-1 flex bg-sidebar-accent hover:bg-sidebar-accent-active/75 items-center rounded group-data-[state=open]:bg-sidebar-accent-active group-data-[state=open]:text-sidebar-accent-foreground">
-                      <div className="grid flex-1 text-left leading-tight min-w-0">
-                        <span className="truncate text-xl font-display">{shortName}</span>
-                        <span className="truncate text-xs uppercase opacity-50 group-hover/item:opacity-100">
-                          {user?.email ?? ""}
-                        </span>
-                      </div>
-                      <DotsVerticalIcon className="ml-auto size-4" />
+                <div className="flex gap-0.5 w-full">
+                  <UserAvatar seed={user?.userId ?? user?.email ?? "local"} size={56} />
+                  <div className="pl-3 pr-1.5 pt-2 pb-1.5 flex-1 flex bg-sidebar-accent items-center rounded">
+                    <div className="grid flex-1 text-left leading-tight min-w-0">
+                      <span className="truncate text-xl font-display">{shortName}</span>
+                      <span className="truncate text-xs uppercase opacity-50">
+                        {rootDir ? rootDir.split("/").pop() || rootDir : "ARX Drive"}
+                      </span>
                     </div>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="w-56 p-0"
-                    side="top"
-                    align="end"
-                    sideOffset={4}
-                  >
-                    <div className="flex flex-col">
-                      <button
-                        onClick={handleLogout}
-                        className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-accent text-left"
-                      >
-                        <LogOut className="size-4" />
-                        Sign out
-                      </button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                  </div>
+                </div>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {/* Storage location display */}
+
         {rootDir && (
           <div className="px-3 pb-2 pt-1">
             <div
