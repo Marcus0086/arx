@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   useInfiniteQuery,
@@ -310,6 +310,43 @@ export default function VaultDetailPage() {
     qc.invalidateQueries({ queryKey: ["vaults"] });
   }
 
+  // Opens the native file picker. Uses Tauri's dialog + fs APIs (reliable in
+  // WKWebView) with a DOM-appended input as fallback for browser dev mode.
+  const handlePickFiles = useCallback(async () => {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const { readFile } = await import("@tauri-apps/plugin-fs");
+      const selected = await open({ multiple: true });
+      if (!selected) return;
+      const paths = Array.isArray(selected) ? selected : [selected];
+      const files = await Promise.all(
+        paths.map(async (p) => {
+          const bytes = await readFile(p);
+          const name = p.split(/[/\\]/).pop() ?? p;
+          return new File([bytes], name);
+        }),
+      );
+      if (files.length > 0) handleUpload(files);
+    } catch {
+      // Fallback: attach input to DOM so WKWebView opens the picker correctly.
+      const inp = document.createElement("input");
+      inp.type = "file";
+      inp.multiple = true;
+      inp.style.cssText = "display:none;position:fixed;top:0;left:0;";
+      document.body.appendChild(inp);
+      const cleanup = () => {
+        if (inp.parentNode) document.body.removeChild(inp);
+      };
+      inp.addEventListener("change", () => {
+        const fs = inp.files;
+        cleanup();
+        if (fs?.length) handleUpload(Array.from(fs));
+      });
+      inp.addEventListener("cancel", cleanup);
+      inp.click();
+    }
+  }, [uploading]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function handleDownload(path: string) {
     try {
       const blob = await sdk.files.download(vaultId, path);
@@ -362,16 +399,7 @@ export default function VaultDetailPage() {
               variant="outline"
               size="sm"
               disabled={uploading}
-              onClick={() => {
-                const inp = document.createElement("input");
-                inp.type = "file";
-                inp.multiple = true;
-                inp.onchange = (e) => {
-                  const fs = (e.target as HTMLInputElement).files;
-                  if (fs && fs.length > 0) handleUpload(Array.from(fs));
-                };
-                inp.click();
-              }}
+              onClick={handlePickFiles}
             >
               {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
               Upload

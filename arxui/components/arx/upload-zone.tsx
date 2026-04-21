@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import { Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,56 @@ interface UploadZoneProps {
 export function UploadZone({ children, onDrop, disabled }: UploadZoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
 
+  // Keep stable refs so the effect closure doesn't go stale.
+  const onDropRef = useRef(onDrop);
+  const disabledRef = useRef(disabled);
+  useEffect(() => {
+    onDropRef.current = onDrop;
+  }, [onDrop]);
+  useEffect(() => {
+    disabledRef.current = disabled;
+  }, [disabled]);
+
+  // Tauri-native OS file drag-drop (handles cases where HTML5 DnD doesn't fire
+  // in WKWebView for files dragged from the macOS Finder).
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+
+    async function setup() {
+      const { getCurrentWebview } = await import("@tauri-apps/api/webview");
+      const { readFile } = await import("@tauri-apps/plugin-fs");
+
+      cleanup = await getCurrentWebview().onDragDropEvent(async (event) => {
+        if (disabledRef.current) return;
+        const p = event.payload;
+
+        if (p.type === "enter") {
+          setIsDragOver(true);
+        } else if (p.type === "leave") {
+          setIsDragOver(false);
+        } else if (p.type === "drop") {
+          setIsDragOver(false);
+          const files = await Promise.all(
+            p.paths.map(async (filePath) => {
+              const bytes = await readFile(filePath);
+              const name = filePath.split(/[/\\]/).pop() ?? filePath;
+              return new File([bytes], name);
+            }),
+          );
+          if (files.length > 0) onDropRef.current(files);
+        }
+      });
+    }
+
+    setup().catch(() => {
+      // Not running inside Tauri — rely on HTML5 DnD via react-dropzone below.
+    });
+
+    return () => {
+      cleanup?.();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleDrop = useCallback(
     (acceptedFiles: File[]) => {
       setIsDragOver(false);
@@ -26,7 +76,7 @@ export function UploadZone({ children, onDrop, disabled }: UploadZoneProps) {
     onDrop: handleDrop,
     onDragEnter: () => setIsDragOver(true),
     onDragLeave: () => setIsDragOver(false),
-    noClick: true, // don't open picker on click (we have a button for that)
+    noClick: true,
     noKeyboard: true,
     disabled,
   });
@@ -36,7 +86,6 @@ export function UploadZone({ children, onDrop, disabled }: UploadZoneProps) {
       <input {...getInputProps()} />
       {children}
 
-      {/* Drag overlay */}
       {(isDragActive || isDragOver) && (
         <div
           className={cn(

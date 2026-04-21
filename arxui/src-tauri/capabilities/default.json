@@ -11,6 +11,10 @@
     "store:allow-set",
     "store:allow-get",
     "store:allow-save",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    {
+      "identifier": "fs:allow-read-file",
+      "allow": [{ "path": "$HOME/**" }, { "path": "/Volumes/**" }, { "path": "$TEMP/**" }]
+    }
   ]
 }
