@@ -1,5 +1,5 @@
 import { createClient } from "@connectrpc/connect";
-import { createConnectTransport } from "@connectrpc/connect-web";
+import { createGrpcWebTransport } from "@connectrpc/connect-web";
 import { ArxService } from "@/src/gen/arx_connect";
 import { CreateTenantRequest, CreateUserRequest } from "@/src/gen/arx_pb";
 
@@ -10,10 +10,7 @@ export class AdminService {
     baseUrl: string,
     private adminKey: string,
   ) {
-    const transport = createConnectTransport({
-      baseUrl,
-      useBinaryFormat: false,
-    });
+    const transport = createGrpcWebTransport({ baseUrl });
     this.client = createClient(ArxService, transport);
   }
 
