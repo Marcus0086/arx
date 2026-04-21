@@ -1,6 +1,9 @@
 use argon2::{
     Argon2, PasswordHasher, PasswordVerifier,
-    password_hash::{PasswordHash, SaltString, rand_core::OsRng},
+    password_hash::{
+        PasswordHash, SaltString,
+        rand_core::{OsRng, RngCore},
+    },
 };
 use sha2::{Digest, Sha256};
 use std::path::Path;
@@ -22,14 +25,8 @@ pub fn sha256_hex(data: &[u8]) -> String {
 }
 
 fn random_bytes(count: usize) -> Vec<u8> {
-    let mut out = Vec::with_capacity(count);
-    let mut remaining = count;
-    while remaining > 0 {
-        let u = Uuid::new_v4();
-        let take = remaining.min(16);
-        out.extend_from_slice(&u.as_bytes()[..take]);
-        remaining -= take;
-    }
+    let mut out = vec![0u8; count];
+    OsRng.fill_bytes(&mut out);
     out
 }
 

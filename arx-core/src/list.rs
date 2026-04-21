@@ -280,7 +280,19 @@ pub fn list(archive: &Path, opts: Option<&ListOptions>) -> Result<()> {
     for fe in &manifest.files {
         let mut c_sum = 0u64;
         for c in &fe.chunk_refs {
-            c_sum += table[c.id as usize].c_size;
+            let id = c.id as usize;
+            if id >= table.len() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "chunk id {} out of bounds (table has {} entries)",
+                        c.id,
+                        table.len()
+                    ),
+                )
+                .into());
+            }
+            c_sum += table[id].c_size;
         }
         println!(
             "{}{}  u={}  c={}  chunks={}",

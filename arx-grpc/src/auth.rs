@@ -2,6 +2,7 @@ use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, deco
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
+use subtle::ConstantTimeEq;
 
 use crate::db::AuthDb;
 
@@ -62,10 +63,10 @@ pub fn check_admin<T>(req: &tonic::Request<T>, admin_key: &str) -> Result<(), to
         ));
     }
     let provided = extract_bearer(req).unwrap_or_default();
-    // Compare SHA-256 digests to prevent naive timing leaks.
+    // Constant-time comparison of SHA-256 digests to prevent timing side-channel attacks.
     let expected = Sha256::digest(admin_key.as_bytes());
     let actual = Sha256::digest(provided.as_bytes());
-    if expected == actual {
+    if expected.ct_eq(&actual).into() {
         Ok(())
     } else {
         Err(tonic::Status::unauthenticated("invalid admin key"))

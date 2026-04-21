@@ -354,6 +354,33 @@ pub fn handle_crud_ls(
     Ok(())
 }
 
+pub fn handle_crud_search(
+    archive: PathBuf,
+    query: String,
+    limit: usize,
+    key_hex: Option<String>,
+    password: Option<String>,
+) -> Result<()> {
+    let aead_key = crud_key(&archive, key_hex, password)?;
+    let arc = CrudArchive::open_with_crypto(&archive, aead_key, [0u8; 32])?;
+    let q = query.to_lowercase();
+    let mut count = 0usize;
+    for (path, entry) in arc.index.by_path.iter() {
+        if path.to_lowercase().contains(&q) {
+            println!("{:>12}  {path}", entry.size);
+            count += 1;
+            if count >= limit {
+                eprintln!("search: showing first {limit} results (use --limit to see more)");
+                break;
+            }
+        }
+    }
+    if count == 0 {
+        eprintln!("search: no results for {query:?}");
+    }
+    Ok(())
+}
+
 pub fn handle_crud_diff(
     archive: PathBuf,
     key_hex: Option<String>,

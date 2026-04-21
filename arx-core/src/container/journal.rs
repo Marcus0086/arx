@@ -85,15 +85,21 @@ impl<'a> Iterator for JournalIter<'a> {
 
 fn read_next_record(f: &mut File, enc: EncMode, salt: [u8; 32]) -> Result<Option<LogRecord>> {
     let start = f.stream_position()?;
-    let len = match read_uvarint(f)? {
-        Some(n) => n,
-        None => return Ok(None),
+    let len = match read_uvarint(f) {
+        Ok(Some(n)) => n,
+        Ok(None) => return Ok(None), // Clean EOF
+        Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+            // Partial varint — process crashed mid-write; stop replay gracefully
+            return Ok(None);
+        }
+        Err(e) => return Err(e.into()),
     };
     let payload_off = start + uvarint_len(len) as u64;
 
     let mut buf = vec![0u8; len as usize];
     if let Err(e) = f.read_exact(&mut buf) {
         if e.kind() == std::io::ErrorKind::UnexpectedEof {
+            // Partial record body — stop replay gracefully
             return Ok(None);
         }
         return Err(e.into());
@@ -151,9 +157,16 @@ impl Journal {
             let mut magic = [0u8; 8];
             f.read_exact(&mut magic)?;
             if &magic != MAGIC {
-                // Re-init on magic mismatch
-                f.seek(SeekFrom::Start(0))?;
-                f.set_len(0)?;
+                // Back up the corrupted journal rather than silently truncating it.
+                let backup = path.with_extension("log.corrupt");
+                drop(f);
+                let _ = std::fs::rename(path, &backup);
+                // Re-open fresh (backup rename freed the path slot)
+                f = OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create(true)
+                    .open(path)?;
                 let (flags, salt) = match enc {
                     EncMode::Plain => (0u8, [0u8; 32]),
                     EncMode::Aead { salt, .. } => (FLAG_AEAD, salt),

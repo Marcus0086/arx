@@ -79,7 +79,20 @@ impl Opened {
         // Use the archive's stored kdf_salt for nonce derivation
         let salt = sb.kdf_salt;
 
+        const MAX_MANIFEST_SIZE: u64 = 256 * 1024 * 1024; // 256 MiB
+        const MAX_TABLE_SIZE: u64 = 64 * 1024 * 1024; // 64 MiB
+
         // Manifest
+        if sb.manifest_len > MAX_MANIFEST_SIZE {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "manifest_len {} exceeds maximum {}",
+                    sb.manifest_len, MAX_MANIFEST_SIZE
+                ),
+            )
+            .into());
+        }
         f.seek(SeekFrom::Start(header_len))?;
         let mut mbytes = vec![0u8; sb.manifest_len as usize];
         f.read_exact(&mut mbytes)?;
@@ -94,6 +107,16 @@ impl Opened {
 
         // Chunk table
         let table_ct_len = sb.data_off - sb.chunk_table_off;
+        if table_ct_len > MAX_TABLE_SIZE {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "chunk table size {} exceeds maximum {}",
+                    table_ct_len, MAX_TABLE_SIZE
+                ),
+            )
+            .into());
+        }
         f.seek(SeekFrom::Start(sb.chunk_table_off))?;
         let mut tbytes = vec![0u8; table_ct_len as usize];
         f.read_exact(&mut tbytes)?;
@@ -153,7 +176,19 @@ impl Opened {
         let mut acc = 0u64;
         let mut out = Vec::with_capacity(fe.chunk_refs.len());
         for (ord, cref) in fe.chunk_refs.iter().enumerate() {
-            let ce = &self.table[cref.id as usize];
+            let id = cref.id as usize;
+            if id >= self.table.len() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "manifest chunk id {} out of bounds (table has {} entries)",
+                        cref.id,
+                        self.table.len()
+                    ),
+                )
+                .into());
+            }
+            let ce = &self.table[id];
             let end = acc + ce.u_size;
             let pct_end = (end as f64 / fe.u_size.max(1) as f64) as f32;
             out.push(ChunkView {

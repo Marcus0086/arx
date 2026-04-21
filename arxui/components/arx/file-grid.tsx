@@ -23,6 +23,8 @@ import type { FileEntry } from "@/src/sdk";
 interface FileGridProps {
   vaultId: string;
   files: FileEntry[];
+  selectedPaths?: Set<string>;
+  onToggleSelect?: (path: string, shift: boolean) => void;
   onPreview: (file: FileEntry) => void;
   onDownload: (path: string) => void;
   onDelete: (path: string) => void;
@@ -31,10 +33,14 @@ interface FileGridProps {
 export function FileGrid({
   vaultId,
   files,
+  selectedPaths,
+  onToggleSelect,
   onPreview,
   onDownload,
   onDelete,
 }: FileGridProps) {
+  const selectionActive = (selectedPaths?.size ?? 0) > 0;
+
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
       {files.map((file) => (
@@ -42,6 +48,11 @@ export function FileGrid({
           key={file.path}
           vaultId={vaultId}
           file={file}
+          isSelected={selectedPaths?.has(file.path) ?? false}
+          selectionActive={selectionActive}
+          onToggleSelect={
+            onToggleSelect ? (shift) => onToggleSelect(file.path, shift) : undefined
+          }
           onPreview={() => onPreview(file)}
           onDownload={() => onDownload(file.path)}
           onDelete={() => onDelete(file.path)}
@@ -54,6 +65,9 @@ export function FileGrid({
 interface FileItemProps {
   vaultId: string;
   file: FileEntry;
+  isSelected: boolean;
+  selectionActive: boolean;
+  onToggleSelect?: (shift: boolean) => void;
   onPreview: () => void;
   onDownload: () => void;
   onDelete: () => void;
@@ -68,7 +82,16 @@ function getExt(path: string) {
   return path.split(".").pop()?.toLowerCase() ?? "";
 }
 
-function FileItem({ vaultId, file, onPreview, onDownload, onDelete }: FileItemProps) {
+function FileItem({
+  vaultId,
+  file,
+  isSelected,
+  selectionActive,
+  onToggleSelect,
+  onPreview,
+  onDownload,
+  onDelete,
+}: FileItemProps) {
   const ext = getExt(file.path);
   const isImage = IMAGE_EXTS.has(ext);
   const isVideo = VIDEO_EXTS.has(ext);
@@ -91,10 +114,48 @@ function FileItem({ vaultId, file, onPreview, onDownload, onDelete }: FileItemPr
     <ContextMenu>
       <ContextMenuTrigger>
         <div
-          className="group relative flex flex-col gap-1 p-1.5 rounded-lg cursor-pointer transition-all bg-pop ring-1 ring-transparent hover:ring-border"
+          className={`group relative flex flex-col gap-1 p-1.5 rounded-lg cursor-pointer transition-all bg-pop ring-1 ${
+            isSelected
+              ? "ring-primary bg-primary/5"
+              : "ring-transparent hover:ring-border"
+          }`}
           onClick={onPreview}
         >
-          {/* Hover delete button */}
+          {/* Checkbox — always visible when selection is active; appears on hover otherwise */}
+          {onToggleSelect && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSelect(e.shiftKey);
+              }}
+              className={`absolute top-2 left-2 z-10 flex items-center justify-center w-5 h-5 rounded border transition-opacity
+                ${
+                  selectionActive || isSelected
+                    ? "opacity-100"
+                    : "opacity-0 group-hover:opacity-100"
+                }
+                ${
+                  isSelected
+                    ? "bg-primary border-primary text-primary-foreground"
+                    : "bg-background/80 border-border"
+                }`}
+              aria-label={isSelected ? "Deselect" : "Select"}
+            >
+              {isSelected && (
+                <svg
+                  viewBox="0 0 12 12"
+                  className="w-3 h-3"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M2 6l3 3 5-5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </button>
+          )}
+
+          {/* Hover delete button (right side) */}
           <button
             onClick={(e) => {
               e.stopPropagation();

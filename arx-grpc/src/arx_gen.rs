@@ -267,6 +267,9 @@ pub struct CrudLsRequest {
     pub offset: u32,
     #[prost(uint32, tag = "6")]
     pub limit: u32,
+    /// When true, `prefix` is treated as a case-insensitive substring query.
+    #[prost(bool, tag = "7")]
+    pub search_mode: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CrudLsEntry {

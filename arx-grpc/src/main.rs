@@ -3,6 +3,7 @@ mod db;
 mod server;
 mod store;
 mod upload;
+mod util;
 
 // Pre-generated prost/tonic types for arx.proto.
 // To regenerate: install protoc and run `cargo build -p arx-grpc`.

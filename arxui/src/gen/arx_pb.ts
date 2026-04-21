@@ -1183,6 +1183,14 @@ export class CrudLsRequest extends Message<CrudLsRequest> {
    */
   limit = 0;
 
+  /**
+   * When true, treat `prefix` as a case-insensitive substring query
+   * instead of a path prefix filter.
+   *
+   * @generated from field: bool search_mode = 7;
+   */
+  searchMode = false;
+
   constructor(data?: PartialMessage<CrudLsRequest>) {
     super();
     proto3.util.initPartial(data, this);
@@ -1197,6 +1205,7 @@ export class CrudLsRequest extends Message<CrudLsRequest> {
     { no: 4, name: "key", kind: "message", T: KeyMaterial },
     { no: 5, name: "offset", kind: "scalar", T: 13 /* ScalarType.UINT32 */ },
     { no: 6, name: "limit", kind: "scalar", T: 13 /* ScalarType.UINT32 */ },
+    { no: 7, name: "search_mode", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): CrudLsRequest {

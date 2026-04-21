@@ -120,6 +120,13 @@ pub fn run() -> Result<()> {
                 key_hex,
                 password,
             } => handlers::handle_crud_ls(archive, prefix, long, key_hex, password),
+            CrudCommands::Search {
+                archive,
+                query,
+                limit,
+                key_hex,
+                password,
+            } => handlers::handle_crud_search(archive, query, limit, key_hex, password),
             CrudCommands::Diff {
                 archive,
                 key_hex,

@@ -107,6 +107,19 @@ pub enum CrudCommands {
         password: Option<String>,
     },
 
+    /// Search file paths in the overlay using a case-insensitive substring query.
+    Search {
+        archive: PathBuf,
+        /// Substring to search for in file paths.
+        query: String,
+        #[arg(long, default_value_t = 500)]
+        limit: usize,
+        #[arg(long = "key")]
+        key_hex: Option<String>,
+        #[arg(long = "password")]
+        password: Option<String>,
+    },
+
     /// Show what changed in the overlay vs the base archive.
     Diff {
         archive: PathBuf,

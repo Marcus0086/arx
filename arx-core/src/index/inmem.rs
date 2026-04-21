@@ -31,27 +31,35 @@ impl InMemIndex {
         let mut idx = InMemIndex::default();
 
         for fe in &opened.manifest.files {
-            let chunks: Vec<ChunkRef> = fe
-                .chunk_refs
-                .iter()
-                .map(|cr| {
-                    let ce = &opened.table[cr.id as usize];
-                    let codec = match ce.codec {
-                        0 => CodecId::Store,
-                        _ => CodecId::Zstd,
-                    };
-                    ChunkRef {
-                        loc: Loc::Base,
-                        // For Base chunks, off stores the chunk TABLE index so we
-                        // can reconstruct the data_off and perform AEAD with the
-                        // right nonce (nonce is derived from chunk_id).
-                        off: cr.id,
-                        len: ce.c_size,
-                        codec,
-                        blake3: ce.blake3,
-                    }
-                })
-                .collect();
+            let mut chunks: Vec<ChunkRef> = Vec::with_capacity(fe.chunk_refs.len());
+            for cr in &fe.chunk_refs {
+                if (cr.id as usize) >= opened.table.len() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!(
+                            "manifest chunk id {} out of bounds (table has {} entries)",
+                            cr.id,
+                            opened.table.len()
+                        ),
+                    )
+                    .into());
+                }
+                let ce = &opened.table[cr.id as usize];
+                let codec = match ce.codec {
+                    0 => CodecId::Store,
+                    _ => CodecId::Zstd,
+                };
+                chunks.push(ChunkRef {
+                    loc: Loc::Base,
+                    // For Base chunks, off stores the chunk TABLE index so we
+                    // can reconstruct the data_off and perform AEAD with the
+                    // right nonce (nonce is derived from chunk_id).
+                    off: cr.id,
+                    len: ce.c_size,
+                    codec,
+                    blake3: ce.blake3,
+                });
+            }
 
             idx.by_path.insert(
                 fe.path.clone(),

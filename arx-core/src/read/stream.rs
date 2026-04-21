@@ -1,6 +1,7 @@
 use super::opened::Opened;
 use crate::crypto::aead::{Region, derive_nonce};
 use crate::error::Result;
+use blake3;
 use std::io::{Cursor, Read};
 
 pub struct FileReader<'a> {
@@ -26,6 +27,16 @@ impl<'a> FileReader<'a> {
             return Ok(false);
         }
         let idx = self.chunk_ids[self.cur] as usize;
+        if idx >= self.arx.table.len() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "chunk id {} out of bounds (table has {} entries)",
+                    idx,
+                    self.arx.table.len()
+                ),
+            ));
+        }
         let ce = &self.arx.table[idx];
 
         // Lock-free positional read (no Mutex needed)
@@ -46,6 +57,17 @@ impl<'a> FileReader<'a> {
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?
             .decompress(&mut pt.as_slice(), &mut plain)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+
+        // Per-chunk blake3 integrity check (v4+ archives only — v3 entries have zero hash)
+        if ce.blake3 != [0u8; 32] {
+            let actual = *blake3::hash(&plain).as_bytes();
+            if actual != ce.blake3 {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("chunk {} blake3 mismatch: data corrupted", idx),
+                ));
+            }
+        }
 
         self.cur += 1;
         self.cur_buf = Some(Cursor::new(plain));
@@ -83,13 +105,24 @@ impl<'a> RangeReader<'a> {
         let mut chunk_start_idx = 0usize;
         let mut offset_in_chunk = start;
         let chunk_ids: Vec<u32> = map.iter().map(|v| v.id as u32).collect();
+        let mut found_chunk = false;
 
         for (i, cv) in map.iter().enumerate() {
             if offset_in_chunk < cv.u_len {
                 chunk_start_idx = i;
+                found_chunk = true;
                 break;
             }
             offset_in_chunk -= cv.u_len;
+        }
+
+        // If start > 0 and no chunk contained it, start is past EOF
+        if !found_chunk && start > 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("start offset {start} exceeds file size"),
+            )
+            .into());
         }
 
         // Build a FileReader starting at the right chunk

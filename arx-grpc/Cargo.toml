@@ -31,6 +31,7 @@ axum = { version = "0.8", features = ["multipart"] }
 dashmap = "6"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+subtle = "2.6.1"
 
 [build-dependencies]
 tonic-build = "0.14"

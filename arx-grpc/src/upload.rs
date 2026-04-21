@@ -1,4 +1,4 @@
-use std::path::{Component, Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::{
@@ -13,6 +13,7 @@ use tokio::sync::Mutex;
 use crate::auth::extract_identity;
 use crate::db::AuthDb;
 use crate::store::ArchiveStore;
+use crate::util::sanitize_path;
 use arx_core::crud::CrudArchive;
 
 /// Max upload size per request (2 GiB). Browsers typically hit memory limits before this.
@@ -27,23 +28,6 @@ pub struct UploadState {
 
 pub fn body_limit() -> DefaultBodyLimit {
     DefaultBodyLimit::max(MAX_UPLOAD_BYTES)
-}
-
-/// Reject any path component that isn't a plain filename segment.
-/// Returns None if the path contains `..`, absolute roots, or is empty.
-fn sanitize_path(raw: &str) -> Option<PathBuf> {
-    let mut out = PathBuf::new();
-    for comp in Path::new(raw).components() {
-        match comp {
-            Component::Normal(c) => out.push(c),
-            _ => return None,
-        }
-    }
-    if out.as_os_str().is_empty() {
-        None
-    } else {
-        Some(out)
-    }
 }
 
 /// POST /api/upload/{archive_id}

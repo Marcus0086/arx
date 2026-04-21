@@ -80,6 +80,15 @@ impl Superblock {
         let mut v = [0u8; 2];
         r.read_exact(&mut v)?;
         let version = u16::from_le_bytes(v);
+        match version {
+            3 | 4 => {}
+            v => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("unsupported archive version: {v} (supported: 3, 4)"),
+                ));
+            }
+        }
 
         let mut ml = [0u8; 8];
         r.read_exact(&mut ml)?;

@@ -130,7 +130,7 @@ message CrudRmResponse   { bool ok = 1; string error = 2; }
 message CrudMvRequest    { string archive_id = 1; string from = 2; string to = 3; KeyMaterial key = 4; }
 message CrudMvResponse   { bool ok = 1; string error = 2; }
 
-message CrudLsRequest    { string archive_id = 1; string prefix = 2; bool long_format = 3; KeyMaterial key = 4; uint32 offset = 5; uint32 limit = 6; }
+message CrudLsRequest    { string archive_id = 1; string prefix = 2; bool long_format = 3; KeyMaterial key = 4; uint32 offset = 5; uint32 limit = 6; bool search_mode = 7; }
 message CrudLsEntry      { string path = 1; uint64 size = 2; uint64 mtime = 3; }
 message CrudLsResponse   { repeated CrudLsEntry entries = 1; uint32 total_count = 2; }
 

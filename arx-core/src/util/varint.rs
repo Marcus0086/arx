@@ -10,14 +10,27 @@ pub fn write_uvarint(out: &mut impl Write, mut x: u64) -> io::Result<()> {
 }
 
 /// Decode a varint from any `Read`. Returns `None` at clean EOF (zero bytes read).
+/// Returns `Err(UnexpectedEof)` if EOF occurs after partial bytes were already read
+/// (indicates a crash during journal write).
 pub fn read_uvarint<R: Read>(r: &mut R) -> io::Result<Option<u64>> {
     let mut x: u64 = 0;
     let mut s: u32 = 0;
+    let mut bytes_read: usize = 0;
     for _ in 0..10 {
         let mut b = [0u8; 1];
         match r.read(&mut b) {
-            Ok(0) => return Ok(None),
+            Ok(0) => {
+                if bytes_read == 0 {
+                    return Ok(None); // Clean EOF — no record started
+                } else {
+                    return Err(io::Error::new(
+                        io::ErrorKind::UnexpectedEof,
+                        "partial varint at journal EOF (incomplete write?)",
+                    ));
+                }
+            }
             Ok(_) => {
+                bytes_read += 1;
                 let byte = b[0];
                 if byte < 0x80 {
                     x |= (byte as u64) << s;

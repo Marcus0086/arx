@@ -178,6 +178,16 @@ impl CrudArchive {
     }
 
     pub fn rename(&mut self, from: &str, to: &str) -> Result<()> {
+        if !self.index.by_path.contains_key(from) {
+            return Err(ArxError::Format(format!(
+                "rename: source not found: {from}"
+            )));
+        }
+        if self.index.by_path.contains_key(to) {
+            return Err(ArxError::Format(format!(
+                "rename: target already exists: {to}"
+            )));
+        }
         let rec = LogRecord::Rename {
             from: from.to_string(),
             to: to.to_string(),
@@ -330,6 +340,10 @@ impl CrudArchive {
 
         // Atomic rename if writing in-place
         std::fs::rename(&tmp_out, &final_out)?;
+
+        // Clean up sidecar files — all changes are now in the new base archive.
+        let _ = std::fs::remove_file(&arc.log_path);
+        let _ = std::fs::remove_file(&arc.delta_path);
         Ok(())
     }
 

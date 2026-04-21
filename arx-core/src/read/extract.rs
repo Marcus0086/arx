@@ -20,6 +20,10 @@ pub struct ExtractOptions {
     pub password: Option<String>,
 }
 
+const MAX_MANIFEST_SIZE: u64 = 256 * 1024 * 1024; // 256 MiB
+const MAX_TABLE_SIZE: u64 = 64 * 1024 * 1024; // 64 MiB (1M chunks × 64B)
+const MAX_CHUNK_SIZE: u64 = 2 * 1024 * 1024; // 2 MiB (FastCDC max 1 MiB + overhead)
+
 pub fn extract(archive: &Path, dest: &Path, opts: Option<&ExtractOptions>) -> Result<()> {
     let mut f = File::open(archive)?;
     let sb = Superblock::read_from(&mut f)?;
@@ -27,6 +31,17 @@ pub fn extract(archive: &Path, dest: &Path, opts: Option<&ExtractOptions>) -> Re
     let enc_enabled = (sb.flags & FLAG_ENCRYPTED) != 0;
 
     let enc = resolve_enc(&sb, opts, enc_enabled)?;
+
+    if sb.manifest_len > MAX_MANIFEST_SIZE {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!(
+                "manifest_len {} exceeds maximum {}",
+                sb.manifest_len, MAX_MANIFEST_SIZE
+            ),
+        )
+        .into());
+    }
 
     f.seek(SeekFrom::Start(header_len))?;
     let mut man_bytes = vec![0u8; sb.manifest_len as usize];
@@ -44,6 +59,16 @@ pub fn extract(archive: &Path, dest: &Path, opts: Option<&ExtractOptions>) -> Re
 
     f.seek(SeekFrom::Start(sb.chunk_table_off))?;
     let table_len = sb.data_off - sb.chunk_table_off;
+    if table_len > MAX_TABLE_SIZE {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!(
+                "chunk table size {} exceeds maximum {}",
+                table_len, MAX_TABLE_SIZE
+            ),
+        )
+        .into());
+    }
     let mut table_bytes = vec![0u8; table_len as usize];
     f.read_exact(&mut table_bytes)?;
 
@@ -72,7 +97,29 @@ pub fn extract(archive: &Path, dest: &Path, opts: Option<&ExtractOptions>) -> Re
         let mut out = File::create(&outp)?;
 
         for cref in &fe.chunk_refs {
-            let ce: &ChunkEntry = &table[cref.id as usize];
+            let id = cref.id as usize;
+            if id >= table.len() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "chunk id {} out of bounds (table has {} entries)",
+                        cref.id,
+                        table.len()
+                    ),
+                )
+                .into());
+            }
+            let ce: &ChunkEntry = &table[id];
+            if ce.c_size > MAX_CHUNK_SIZE {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "chunk {} c_size {} exceeds maximum {}",
+                        id, ce.c_size, MAX_CHUNK_SIZE
+                    ),
+                )
+                .into());
+            }
             f.seek(SeekFrom::Start(ce.data_off))?;
 
             let mut cbuf = vec![0u8; ce.c_size as usize];

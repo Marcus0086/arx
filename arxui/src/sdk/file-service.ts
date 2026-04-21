@@ -216,4 +216,27 @@ export class FileService {
     const res = await this.client.crudDiff({ archiveId: vaultId });
     return res.entries.map((e) => ({ kind: e.kind, path: e.path }));
   }
+
+  async search(
+    vaultId: string,
+    query: string,
+    opts?: { offset?: number; limit?: number },
+  ): Promise<{ entries: FileEntry[]; total: number }> {
+    const res = await this.client.crudLs({
+      archiveId: vaultId,
+      prefix: query,
+      longFormat: true,
+      searchMode: true,
+      offset: opts?.offset ?? 0,
+      limit: opts?.limit ?? 500,
+    });
+    return {
+      entries: res.entries.map((e) => ({
+        path: e.path,
+        size: e.size,
+        mtime: e.mtime,
+      })),
+      total: res.totalCount,
+    };
+  }
 }

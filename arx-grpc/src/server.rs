@@ -19,6 +19,7 @@ use crate::arx::*;
 use crate::auth::{check_admin, extract_bearer, extract_identity, extract_tenant, issue_jwt};
 use crate::db::AuthDb;
 use crate::store::ArchiveStore;
+use crate::util::sanitize_path;
 
 pub struct ArxServiceImpl {
     pub store: Arc<ArchiveStore>,
@@ -140,7 +141,9 @@ impl ArxService for ArxServiceImpl {
                     if let Some((_, mut f)) = current_file.take() {
                         let _ = std::io::Write::flush(&mut f);
                     }
-                    let dest = tmp.path().join(fi.path.trim_start_matches('/'));
+                    let safe_rel = sanitize_path(&fi.path)
+                        .ok_or_else(|| Status::invalid_argument("invalid file path"))?;
+                    let dest = tmp.path().join(safe_rel);
                     if let Some(parent) = dest.parent() {
                         std::fs::create_dir_all(parent)
                             .map_err(|e| Status::internal(e.to_string()))?;
@@ -464,7 +467,9 @@ impl ArxService for ArxServiceImpl {
                         let _ = std::io::Write::flush(&mut f);
                         files.push((p, path, m, t));
                     }
-                    let dest = tmp.path().join(fi.path.trim_start_matches('/'));
+                    let safe_rel = sanitize_path(&fi.path)
+                        .ok_or_else(|| Status::invalid_argument("invalid file path"))?;
+                    let dest = tmp.path().join(&safe_rel);
                     if let Some(par) = dest.parent() {
                         std::fs::create_dir_all(par)
                             .map_err(|e| Status::internal(e.to_string()))?;
@@ -594,16 +599,26 @@ impl ArxService for ArxServiceImpl {
         let prefix = req.prefix.clone();
         let offset = req.offset as usize;
         let limit = req.limit as usize;
+        let search_mode = req.search_mode;
 
         let (entries, total_count) = tokio::task::spawn_blocking(
             move || -> arx_core::error::Result<(Vec<CrudLsEntry>, u32)> {
                 let arc = CrudArchive::open_with_crypto(&archive_path, aead_key, [0u8; 32])?;
+                let query_lower = prefix.to_lowercase();
                 // BTreeMap iterates in sorted path order already
                 let all: Vec<CrudLsEntry> = arc
                     .index
                     .by_path
                     .iter()
-                    .filter(|(p, _)| prefix.is_empty() || p.starts_with(&prefix))
+                    .filter(|(p, _)| {
+                        if prefix.is_empty() {
+                            true
+                        } else if search_mode {
+                            p.to_lowercase().contains(&query_lower)
+                        } else {
+                            p.starts_with(&prefix)
+                        }
+                    })
                     .map(|(p, e)| CrudLsEntry {
                         path: p.clone(),
                         size: e.size,
