@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { useForm } from "react-hook-form";
@@ -71,14 +71,16 @@ export default function SetupPage() {
   });
 
   // Load default rootDir from Tauri on mount
-  useState(() => {
+  useEffect(() => {
     invoke<string>("get_root_dir")
       .then((dir) => {
-        setRootDir(dir);
-        storageForm.setValue("rootDir", dir);
+        if (dir) {
+          setRootDir(dir);
+          storageForm.setValue("rootDir", dir);
+        }
       })
       .catch(() => {});
-  });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handlePickFolder() {
     try {
@@ -97,8 +99,11 @@ export default function SetupPage() {
     setSetupError(null);
 
     try {
-      // 1. Save root dir to config
-      await invoke("save_root_dir", { rootDir });
+      // 1. Save root dir to config (use Tauri's default if somehow empty)
+      const effectiveRootDir =
+        rootDir || (await invoke<string>("get_root_dir").catch(() => ""));
+      if (!effectiveRootDir) throw new Error("Storage location is required");
+      await invoke("save_root_dir", { rootDir: effectiveRootDir });
 
       // 2. Wait for gRPC server to be ready (poll up to 10s)
       const serverUrl = await invoke<string>("get_server_url").catch(

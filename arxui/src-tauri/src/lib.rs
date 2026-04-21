@@ -62,6 +62,9 @@ async fn save_root_dir(
     state: tauri::State<'_, AppState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
+    if root_dir.trim().is_empty() {
+        return Err("root_dir cannot be empty".to_string());
+    }
     use tauri_plugin_store::StoreExt;
     let store = app.store(CONFIG_FILE).map_err(|e| e.to_string())?;
     store.set("root_dir", serde_json::json!(root_dir.clone()));
@@ -80,6 +83,20 @@ async fn mark_setup_complete(
     store.set("setup_complete", serde_json::json!(true));
     store.save().map_err(|e| e.to_string())?;
     *state.setup_complete.lock().unwrap() = true;
+    Ok(())
+}
+
+#[tauri::command]
+async fn reset_setup(
+    state: tauri::State<'_, AppState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    use tauri_plugin_store::StoreExt;
+    let store = app.store(CONFIG_FILE).map_err(|e| e.to_string())?;
+    store.set("setup_complete", serde_json::json!(false));
+    store.delete("root_dir");
+    store.save().map_err(|e| e.to_string())?;
+    *state.setup_complete.lock().unwrap() = false;
     Ok(())
 }
 
@@ -152,10 +169,14 @@ pub fn run() {
                 }
             };
 
-            // Load or default root_dir
+            // Load or default root_dir (filter out empty strings saved by old bugs)
             let root_dir = store
                 .get("root_dir")
-                .and_then(|v| v.as_str().map(str::to_string))
+                .and_then(|v| {
+                    v.as_str()
+                        .filter(|s| !s.trim().is_empty())
+                        .map(str::to_string)
+                })
                 .unwrap_or_else(default_root_dir);
 
             // Load setup_complete flag
@@ -185,6 +206,7 @@ pub fn run() {
             pick_folder,
             save_root_dir,
             mark_setup_complete,
+            reset_setup,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
