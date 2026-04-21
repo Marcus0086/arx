@@ -1,16 +1,17 @@
 use rand::RngCore;
 use std::sync::Mutex;
 use tauri::Manager;
+use tauri_plugin_shell::process::CommandChild;
 
 const CONFIG_FILE: &str = "arx-config.json";
 const DEFAULT_PORT: u16 = 50051;
 
-#[derive(Debug, Default)]
 struct AppState {
     admin_key: Mutex<String>,
     root_dir: Mutex<String>,
     setup_complete: Mutex<bool>,
     port: Mutex<u16>,
+    sidecar: Mutex<Option<CommandChild>>,
 }
 
 fn gen_admin_key() -> String {
@@ -100,22 +101,24 @@ async fn reset_setup(
     Ok(())
 }
 
-fn spawn_sidecar(app: &tauri::AppHandle, root_dir: &str, admin_key: &str, port: u16) {
+fn spawn_sidecar(
+    app: &tauri::AppHandle,
+    root_dir: &str,
+    admin_key: &str,
+    port: u16,
+) -> Option<CommandChild> {
     use tauri_plugin_shell::ShellExt;
-    let cmd = match app.shell().sidecar("arx-grpc") {
-        Ok(c) => c
-            .env("ROOT_DIR", root_dir)
-            .env("ARX_ADMIN_KEY", admin_key)
-            .env("PORT", port.to_string())
-            .env("RUST_LOG", "info"),
-        Err(e) => {
-            eprintln!("[arx-grpc] sidecar not found: {e}");
-            return;
-        }
-    };
+    let cmd = app
+        .shell()
+        .sidecar("arx-grpc")
+        .ok()?
+        .env("ROOT_DIR", root_dir)
+        .env("ARX_ADMIN_KEY", admin_key)
+        .env("PORT", port.to_string())
+        .env("RUST_LOG", "info");
 
     match cmd.spawn() {
-        Ok((mut rx, _child)) => {
+        Ok((mut rx, child)) => {
             tauri::async_runtime::spawn(async move {
                 while let Some(event) = rx.recv().await {
                     use tauri_plugin_shell::process::CommandEvent;
@@ -136,8 +139,12 @@ fn spawn_sidecar(app: &tauri::AppHandle, root_dir: &str, admin_key: &str, port: 
                     }
                 }
             });
+            Some(child)
         }
-        Err(e) => eprintln!("[arx-grpc] failed to spawn: {e}"),
+        Err(e) => {
+            eprintln!("[arx-grpc] failed to spawn: {e}");
+            None
+        }
     }
 }
 
@@ -169,7 +176,7 @@ pub fn run() {
                 }
             };
 
-            // Load or default root_dir (filter out empty strings saved by old bugs)
+            // Load or default root_dir (filter out empty strings)
             let root_dir = store
                 .get("root_dir")
                 .and_then(|v| {
@@ -185,18 +192,31 @@ pub fn run() {
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
 
-            let state = AppState {
-                admin_key: Mutex::new(admin_key.clone()),
-                root_dir: Mutex::new(root_dir.clone()),
+            // Start the gRPC sidecar, keep handle for shutdown
+            let sidecar_child = spawn_sidecar(app.handle(), &root_dir, &admin_key, DEFAULT_PORT);
+
+            app.manage(AppState {
+                admin_key: Mutex::new(admin_key),
+                root_dir: Mutex::new(root_dir),
                 setup_complete: Mutex::new(setup_complete),
                 port: Mutex::new(DEFAULT_PORT),
-            };
-            app.manage(state);
-
-            // Start the gRPC sidecar
-            spawn_sidecar(app.handle(), &root_dir, &admin_key, DEFAULT_PORT);
+                sidecar: Mutex::new(sidecar_child),
+            });
 
             Ok(())
+        })
+        // Kill the sidecar when the last window is destroyed
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event {
+                if let Some(state) = window.app_handle().try_state::<AppState>() {
+                    if let Ok(mut guard) = state.sidecar.lock() {
+                        if let Some(child) = guard.take() {
+                            let _ = child.kill();
+                            println!("[arx-grpc] killed on window close");
+                        }
+                    }
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             get_server_url,

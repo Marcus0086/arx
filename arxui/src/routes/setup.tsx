@@ -116,9 +116,18 @@ export default function SetupPage() {
 
       // 4. Create tenant + user via admin API
       const admin = new AdminService(serverUrl, adminKey);
-      // Use a unique name so repeated setup runs never hit UNIQUE constraint
+      // Unique name so repeated runs never hit UNIQUE constraint on tenants.name
       const tenantId = await admin.createTenant(`workspace-${Date.now()}`);
-      await admin.createUser(tenantId, data.email, data.password);
+      try {
+        await admin.createUser(tenantId, data.email, data.password);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        // Email already exists — user was created in a previous setup run;
+        // proceed to login rather than failing here.
+        if (!msg.toLowerCase().includes("unique constraint failed: users.email")) {
+          throw err;
+        }
+      }
 
       // 5. Mark setup complete
       await invoke("mark_setup_complete");
