@@ -50,6 +50,23 @@ fn arx_err(e: ArxError) -> Status {
     }
 }
 
+/// Map ArxError to tonic Status, adding archive context to the log line.
+fn arx_err_ctx(e: ArxError, tenant_id: &str, archive_id: &str) -> Status {
+    match e {
+        ArxError::AeadError => Status::unauthenticated("AEAD authentication failed — wrong key"),
+        ArxError::Io(ref io) => {
+            tracing::error!(
+                tenant_id = %tenant_id,
+                archive_id = %archive_id,
+                error = %io,
+                "storage IO error"
+            );
+            Status::internal("storage error")
+        }
+        ArxError::Format(msg) => Status::invalid_argument(msg),
+    }
+}
+
 /// Resolve a raw 32-byte key from KeyMaterial + archive superblock (for password derivation).
 fn resolve_key(archive_path: &Path, key: Option<&KeyMaterial>) -> Result<Option<[u8; 32]>, Status> {
     let Some(km) = key else { return Ok(None) };
@@ -600,6 +617,7 @@ impl ArxService for ArxServiceImpl {
         let offset = req.offset as usize;
         let limit = req.limit as usize;
         let search_mode = req.search_mode;
+        tracing::debug!(tenant_id = %tenant_id, archive_id = %req.archive_id, "crud_ls");
 
         let (entries, total_count) = tokio::task::spawn_blocking(
             move || -> arx_core::error::Result<(Vec<CrudLsEntry>, u32)> {
@@ -636,7 +654,7 @@ impl ArxService for ArxServiceImpl {
         )
         .await
         .map_err(|e| Status::internal(e.to_string()))?
-        .map_err(arx_err)?;
+        .map_err(|e| arx_err_ctx(e, &tenant_id, &req.archive_id))?;
 
         Ok(Response::new(CrudLsResponse {
             entries,
@@ -665,30 +683,21 @@ impl ArxService for ArxServiceImpl {
             .lock_owned()
             .await;
         tracing::info!(tenant_id = %tenant_id, archive_id = %req.archive_id, "crud_sync");
-        let paths = self.store.archive_paths(&tenant_id, &req.archive_id);
-
-        let tmp_out = paths.data.with_extension("arx.tmp");
         let archive_path_c = archive_path.clone();
-        let tmp_out_c = tmp_out.clone();
-        let journal_c = paths.journal.clone();
-        let delta_c = paths.delta.clone();
         let seal_base = req.seal_base;
 
+        // Pass out=None so sync_to_base handles the in-place atomic rename itself
+        // (writes to .arx.tmp → renames to .arx → deletes sidecars in the right order).
         tokio::task::spawn_blocking(move || -> arx_core::error::Result<()> {
             CrudArchive::sync_to_base(
                 &archive_path_c,
-                Some(&tmp_out_c),
+                None,
                 false,
                 0.05,
                 aead_key,
                 [0u8; 32],
                 seal_base,
-            )?;
-            std::fs::rename(&tmp_out_c, &archive_path_c)?;
-            // Sync has committed everything into the new base — drop the overlay.
-            let _ = std::fs::remove_file(&journal_c);
-            let _ = std::fs::remove_file(&delta_c);
-            Ok(())
+            )
         })
         .await
         .map_err(|e| Status::internal(e.to_string()))?
@@ -720,6 +729,7 @@ impl ArxService for ArxServiceImpl {
         let req = request.into_inner();
         let archive_path = self.store.resolve(&tenant_id, &req.archive_id)?;
         let aead_key = resolve_key(&archive_path, req.key.as_ref())?;
+        tracing::debug!(tenant_id = %tenant_id, archive_id = %req.archive_id, "crud_diff");
 
         let entries =
             tokio::task::spawn_blocking(move || -> arx_core::error::Result<Vec<CrudDiffEntry>> {
@@ -735,7 +745,7 @@ impl ArxService for ArxServiceImpl {
             })
             .await
             .map_err(|e| Status::internal(e.to_string()))?
-            .map_err(arx_err)?;
+            .map_err(|e| arx_err_ctx(e, &tenant_id, &req.archive_id))?;
 
         Ok(Response::new(CrudDiffResponse { entries }))
     }
