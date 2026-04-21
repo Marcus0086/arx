@@ -116,7 +116,8 @@ export default function SetupPage() {
 
       // 4. Create tenant + user via admin API
       const admin = new AdminService(serverUrl, adminKey);
-      const tenantId = await admin.createTenant("My Workspace");
+      // Use a unique name so repeated setup runs never hit UNIQUE constraint
+      const tenantId = await admin.createTenant(`workspace-${Date.now()}`);
       await admin.createUser(tenantId, data.email, data.password);
 
       // 5. Mark setup complete
