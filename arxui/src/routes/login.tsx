@@ -1,5 +1,6 @@
 import { Suspense, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { invoke } from "@tauri-apps/api/core";
 import { useSdk } from "@/src/lib/sdk-context";
 import { useAuthStore } from "@/src/stores/auth-store";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { Archive, Loader2, Lock } from "lucide-react";
 
 function LoginForm() {
   const sdk = useSdk();
-  const setUser = useAuthStore((s) => s.setUser);
+  const { setUser, setHydrated } = useAuthStore();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const next = searchParams.get("next") ?? "/vaults";
@@ -28,6 +29,9 @@ function LoginForm() {
       await sdk.auth.login(email, password);
       const user = await sdk.auth.whoami();
       setUser(user);
+      setHydrated(); // prevent AuthGuard from re-running hydration
+      // persist credentials for silent auto-login on next app launch
+      invoke("save_credentials", { email, password }).catch(() => {});
       navigate(next, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

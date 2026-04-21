@@ -1,7 +1,14 @@
 use rand::RngCore;
+use serde::Serialize;
 use std::sync::Mutex;
 use tauri::Manager;
 use tauri_plugin_shell::process::CommandChild;
+
+#[derive(Serialize)]
+struct StoredCredentials {
+    email: String,
+    password: String,
+}
 
 const CONFIG_FILE: &str = "arx-config.json";
 const DEFAULT_PORT: u16 = 50051;
@@ -84,6 +91,42 @@ async fn mark_setup_complete(
     store.set("setup_complete", serde_json::json!(true));
     store.save().map_err(|e| e.to_string())?;
     *state.setup_complete.lock().unwrap() = true;
+    Ok(())
+}
+
+#[tauri::command]
+async fn save_credentials(
+    email: String,
+    password: String,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    use tauri_plugin_store::StoreExt;
+    let store = app.store(CONFIG_FILE).map_err(|e| e.to_string())?;
+    store.set("user_email", serde_json::json!(email));
+    store.set("user_password", serde_json::json!(password));
+    store.save().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_credentials(app: tauri::AppHandle) -> Option<StoredCredentials> {
+    use tauri_plugin_store::StoreExt;
+    let store = app.store(CONFIG_FILE).ok()?;
+    let email = store.get("user_email")?.as_str()?.to_string();
+    let password = store.get("user_password")?.as_str()?.to_string();
+    if email.is_empty() || password.is_empty() {
+        return None;
+    }
+    Some(StoredCredentials { email, password })
+}
+
+#[tauri::command]
+async fn clear_credentials(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_store::StoreExt;
+    let store = app.store(CONFIG_FILE).map_err(|e| e.to_string())?;
+    store.delete("user_email");
+    store.delete("user_password");
+    store.save().map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -227,6 +270,9 @@ pub fn run() {
             save_root_dir,
             mark_setup_complete,
             reset_setup,
+            save_credentials,
+            get_credentials,
+            clear_credentials,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

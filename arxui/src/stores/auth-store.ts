@@ -1,4 +1,3 @@
-"use client";
 import { create } from "zustand";
 
 interface User {
@@ -9,10 +8,11 @@ interface User {
 
 interface AuthState {
   user: User | null;
-  /** Whether we've attempted hydration from localStorage. */
   hydrated: boolean;
   setUser: (u: User | null) => void;
   setHydrated: () => void;
+  /** Reset to unauthenticated — used by onAuthExpired to trigger re-auth. */
+  reset: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -20,4 +20,5 @@ export const useAuthStore = create<AuthState>((set) => ({
   hydrated: false,
   setUser: (u) => set({ user: u }),
   setHydrated: () => set({ hydrated: true }),
+  reset: () => set({ user: null, hydrated: false }),
 }));

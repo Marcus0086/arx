@@ -35,11 +35,14 @@ export function ArxSidebar() {
   const sdk = useSdk();
   const { user, setUser } = useAuthStore();
 
+  const reset = useAuthStore((s) => s.reset);
+
   async function handleLogout() {
     try {
       await sdk.auth.logout();
     } finally {
-      setUser(null);
+      invoke("clear_credentials").catch(() => {});
+      reset();
       navigate("/login", { replace: true });
     }
   }
