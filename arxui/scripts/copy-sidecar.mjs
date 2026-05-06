@@ -3,14 +3,16 @@ import { cpSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 
 const repoRoot = new URL("../../..", import.meta.url).pathname;
-const triple = execSync("rustc -Vv").toString().match(/host:\s+(\S+)/)?.[1];
+const triple = execSync("rustc -Vv")
+  .toString()
+  .match(/host:\s+(\S+)/)?.[1];
 
 if (!triple) {
   console.error("Could not detect target triple. Is rustc installed?");
   process.exit(1);
 }
 
-const src = join(repoRoot, "target", "release", "arx-grpc");
+const src = join(repoRoot, "arx", "target", "release", "arx-grpc");
 if (!existsSync(src)) {
   console.error(`Binary not found at ${src}`);
   console.error("Run: cargo build -p arx-grpc --release");
